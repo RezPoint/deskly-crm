@@ -1,42 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ..db import get_db
 from ..models import Client
 
+from ..schemas import ClientCreate, ClientOut
+
 router = APIRouter(prefix="/api/clients", tags=["clients"])
 
 
-@router.get("")
+@router.get("", response_model=List[ClientOut])
 def list_clients(db: Session = Depends(get_db)):
     clients = db.execute(select(Client).order_by(Client.id.desc())).scalars().all()
-    return [
-        {
-            "id": c.id,
-            "name": c.name,
-            "phone": c.phone,
-            "telegram": c.telegram,
-            "notes": c.notes,
-            "created_at": c.created_at,
-        }
-        for c in clients
-    ]
+    return clients
 
 
-@router.post("")
-def create_client(payload: dict, db: Session = Depends(get_db)):
-    name = (payload.get("name") or "").strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="name is required")
-
+@router.post("", response_model=ClientOut)
+def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
     c = Client(
-        name=name,
-        phone=payload.get("phone"),
-        telegram=payload.get("telegram"),
-        notes=payload.get("notes"),
+        name=payload.name.strip(),
+        phone=payload.phone,
+        telegram=payload.telegram,
+        notes=payload.notes,
     )
     db.add(c)
     db.commit()
     db.refresh(c)
-    return {"id": c.id, "name": c.name}
+    return c
