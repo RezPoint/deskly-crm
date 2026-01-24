@@ -7,6 +7,8 @@ from . import models  # noqa: F401
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="DesklyCRM")
+from .routes.clients import router as clients_router
+app.include_router(clients_router)
 
 @app.get("/", response_class=HTMLResponse)
 def home():
