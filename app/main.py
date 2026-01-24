@@ -4,11 +4,15 @@ from fastapi.responses import HTMLResponse
 from .db import Base, engine
 from . import models  # noqa: F401
 
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="DesklyCRM")
 from .routes.clients import router as clients_router
+from .routes.orders import router as orders_router
+
 app.include_router(clients_router)
+app.include_router(orders_router)
 
 @app.get("/", response_class=HTMLResponse)
 def home():
