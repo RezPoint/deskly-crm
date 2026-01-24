@@ -21,6 +21,8 @@ def home():
     <p>Status: It works ✅</p>
     <p><a href="/health">Health check</a></p>
     <p><a href="/docs">API Docs</a></p>
+    <p><a href="/docs#/clients/list_clients_api_clients_get">Clients (Swagger)</a></p>
+<p><a href="/docs#/orders/list_orders_api_orders_get">Orders (Swagger)</a></p>
     """
     
 @app.get("/health")
