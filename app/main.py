@@ -22,16 +22,28 @@ app.include_router(export_router)
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """
-    <h1>DesklyCRM</h1>
-    <p>Status: It works ✅</p>
-    <p><a href="/health">Health check</a></p>
-    <p><a href="/docs">API Docs</a></p>
-    <p><a href="/docs#/clients/list_clients_api_clients_get">Clients (Swagger)</a></p>
-    <p><a href="/docs#/orders/list_orders_api_orders_get">Orders (Swagger)</a></p>
-    <p><a href="/docs#/payments">Payments (Swagger)</a></p>
-    <p><a href="/api/export/orders.csv">Download orders.csv</a></p>
-    <p><a href="/api/export/clients.csv">Download clients.csv</a></p>
-    """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DesklyCRM</title>
+</head>
+<body>
+  <h1>DesklyCRM</h1>
+  <p>Status: It works &#x2705;</p>
+
+  <p><a href="/health">Health check</a></p>
+  <p><a href="/docs">API Docs</a></p>
+
+  <p><a href="/docs#/clients/list_clients_api_clients_get">Clients (Swagger)</a></p>
+  <p><a href="/docs#/orders/list_orders_api_orders_get">Orders (Swagger)</a></p>
+  <p><a href="/docs#/payments/create_payment_api_payments_post">Payments (Swagger)</a></p>
+  <p><a href="/docs#/export/export_orders_csv_api_export_orders_csv_get">Export Orders CSV</a></p>
+<p><a href="/docs#/export/export_clients_csv_api_export_clients_csv_get">Export Clients CSV</a></p>
+</body>
+</html>
+"""
 
 
 @app.get("/health")
