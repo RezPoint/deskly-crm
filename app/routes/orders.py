@@ -1,27 +1,30 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ..db import get_db
 from ..models import Client, Order
-from ..schemas import OrderCreate, OrderOut, OrderStatusUpdate
+from ..schemas import OrderCreate, OrderOut, OrderStatus, OrderStatusUpdate
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 
 @router.get("", response_model=List[OrderOut])
 def list_orders(
-    client_id: Optional[int] = None,
-    status: Optional[str] = None,
+    client_id: Optional[int] = Query(None, ge=1),
+    status: Optional[OrderStatus] = None,
     db: Session = Depends(get_db),
 ):
     q = select(Order).order_by(Order.id.desc())
+
     if client_id is not None:
         q = q.where(Order.client_id == client_id)
+
     if status is not None:
-        q = q.where(Order.status == status)
+        q = q.where(Order.status == status.value)
+
     return db.execute(q).scalars().all()
 
 
@@ -61,7 +64,9 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{order_id}/status", response_model=OrderOut)
-def update_order_status(order_id: int, payload: OrderStatusUpdate, db: Session = Depends(get_db)):
+def update_order_status(
+    order_id: int, payload: OrderStatusUpdate, db: Session = Depends(get_db)
+):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
