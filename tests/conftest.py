@@ -1,0 +1,14 @@
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import create_app
+
+
+@pytest.fixture()
+def client(tmp_path):
+    # отдельная БД для каждого запуска тестов
+    db_path = tmp_path / "test.db"
+    app = create_app(f"sqlite:///{db_path}")
+
+    with TestClient(app) as c:
+        yield c
