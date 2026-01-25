@@ -19,7 +19,6 @@ class Client(Base):
 
 
 class Order(Base):
-    payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)

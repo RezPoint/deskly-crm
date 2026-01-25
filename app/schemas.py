@@ -56,7 +56,7 @@ class OrderStatusUpdate(BaseModel):
     
     
 class PaymentCreate(BaseModel):
-    order_id: int
+    order_id: int = Field(..., ge=1)
     amount: float = Field(..., gt=0)
 
 class PaymentOut(BaseModel):
