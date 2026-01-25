@@ -67,3 +67,13 @@ class PaymentOut(BaseModel):
 
     class Config:
         from_attributes = True
+        
+        
+class OrderSummaryOut(BaseModel):
+    order_id: int
+    price: float
+    paid_total: float
+    balance: float
+
+    class Config:
+        from_attributes = True
