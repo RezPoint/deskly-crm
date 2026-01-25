@@ -7,6 +7,7 @@ from . import models  # noqa: F401
 from .routes.clients import router as clients_router
 from .routes.orders import router as orders_router
 from .routes.payments import router as payments_router
+from .routes.export import router as export_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -15,6 +16,7 @@ app = FastAPI(title="DesklyCRM")
 app.include_router(clients_router)
 app.include_router(orders_router)
 app.include_router(payments_router)
+app.include_router(export_router)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -27,6 +29,8 @@ def home():
     <p><a href="/docs#/clients/list_clients_api_clients_get">Clients (Swagger)</a></p>
     <p><a href="/docs#/orders/list_orders_api_orders_get">Orders (Swagger)</a></p>
     <p><a href="/docs#/payments">Payments (Swagger)</a></p>
+    <p><a href="/api/export/orders.csv">Download orders.csv</a></p>
+    <p><a href="/api/export/clients.csv">Download clients.csv</a></p>
     """
 
 
