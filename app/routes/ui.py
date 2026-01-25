@@ -1,0 +1,277 @@
+from __future__ import annotations
+
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+from starlette.responses import RedirectResponse
+
+from ..db import get_db
+from ..models import Client, Order, Payment
+
+router = APIRouter(prefix="/ui", tags=["ui"])
+
+TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def money(v) -> str:
+    """Красивый вывод денег в шаблонах."""
+    if v is None:
+        return "0.00"
+    if isinstance(v, Decimal):
+        return f"{v:.2f}"
+    try:
+        return f"{Decimal(str(v)):.2f}"
+    except Exception:
+        return str(v)
+
+
+templates.env.filters["money"] = money
+
+
+def _to_decimal(s: str, field_name: str) -> Decimal:
+    try:
+        d = Decimal(s.replace(",", ".")).quantize(Decimal("0.01"))
+    except (InvalidOperation, AttributeError):
+        raise HTTPException(status_code=422, detail=f"{field_name} must be a number")
+    return d
+
+
+@router.get("/clients")
+def ui_clients(
+    request: Request,
+    q: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    stmt = select(Client).order_by(Client.id.desc())
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            (Client.name.like(like))
+            | (Client.phone.like(like))
+            | (Client.telegram.like(like))
+        )
+    clients = db.execute(stmt).scalars().all()
+
+    return templates.TemplateResponse(
+        "clients.html",
+        {
+            "request": request,
+            "clients": clients,
+            "q": q or "",
+        },
+    )
+
+
+@router.post("/clients")
+def ui_create_client(
+    request: Request,
+    name: str = Form(...),
+    phone: Optional[str] = Form(None),
+    telegram: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    name_clean = (name or "").strip()
+    if not name_clean:
+        return templates.TemplateResponse(
+            "clients.html",
+            {
+                "request": request,
+                "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
+                "q": "",
+                "error": "Name must not be empty",
+            },
+            status_code=422,
+        )
+
+    phone_clean = phone.strip() if phone else None
+    telegram_clean = telegram.strip() if telegram else None
+    notes_clean = notes.strip() if notes else None
+
+    # простая защита от дублей (как у тебя в API):
+    conditions = []
+    if phone_clean:
+        conditions.append(Client.phone == phone_clean)
+    if telegram_clean:
+        conditions.append(Client.telegram == telegram_clean)
+
+    if conditions:
+        exists = db.execute(select(Client.id).where(*conditions)).scalar_one_or_none()
+        if exists is not None:
+            return templates.TemplateResponse(
+                "clients.html",
+                {
+                    "request": request,
+                    "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
+                    "q": "",
+                    "error": "Client with same phone/telegram already exists",
+                },
+                status_code=409,
+            )
+
+    c = Client(name=name_clean, phone=phone_clean, telegram=telegram_clean, notes=notes_clean)
+    db.add(c)
+    db.commit()
+
+    return RedirectResponse(url="/ui/clients", status_code=303)
+
+
+@router.get("/orders")
+def ui_orders(
+    request: Request,
+    client_id: Optional[int] = Query(None, ge=1),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    clients = db.execute(select(Client).order_by(Client.name.asc())).scalars().all()
+
+    stmt = select(Order).order_by(Order.id.desc())
+    if client_id:
+        stmt = stmt.where(Order.client_id == client_id)
+    if status:
+        stmt = stmt.where(Order.status == status)
+
+    orders = db.execute(stmt).scalars().all()
+
+    # для отображения имени клиента
+    client_map = {c.id: c for c in clients}
+
+    return templates.TemplateResponse(
+        "orders.html",
+        {
+            "request": request,
+            "orders": orders,
+            "clients": clients,
+            "client_map": client_map,
+            "filter_client_id": client_id,
+            "filter_status": status or "",
+        },
+    )
+
+
+@router.post("/orders")
+def ui_create_order(
+    request: Request,
+    client_id: int = Form(...),
+    title: str = Form(...),
+    price: str = Form("0"),
+    status: str = Form("new"),
+    comment: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    client = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
+    if client is None:
+        raise HTTPException(status_code=404, detail="client not found")
+
+    title_clean = (title or "").strip()
+    if not title_clean:
+        raise HTTPException(status_code=422, detail="title must not be empty")
+
+    price_dec = _to_decimal(price, "price")
+    if price_dec < Decimal("0.00"):
+        raise HTTPException(status_code=422, detail="price must be >= 0")
+
+    comment_clean = comment.strip() if comment else None
+
+    o = Order(
+        client_id=client_id,
+        title=title_clean,
+        price=price_dec,
+        status=status,
+        comment=comment_clean,
+    )
+    db.add(o)
+    db.commit()
+    db.refresh(o)
+
+    return RedirectResponse(url=f"/ui/orders/{o.id}", status_code=303)
+
+
+@router.get("/orders/{order_id}")
+def ui_order_detail(
+    request: Request,
+    order_id: int,
+    db: Session = Depends(get_db),
+):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+
+    payments = db.execute(
+        select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+    ).scalars().all()
+
+    paid_total: Decimal = db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+    ).scalar_one()
+
+    balance: Decimal = order.price - paid_total
+
+    return templates.TemplateResponse(
+        "order_detail.html",
+        {
+            "request": request,
+            "order": order,
+            "client": client,
+            "payments": payments,
+            "paid_total": paid_total,
+            "balance": balance,
+            "error": "",
+        },
+    )
+
+
+@router.post("/orders/{order_id}/payments")
+def ui_add_payment(
+    request: Request,
+    order_id: int,
+    amount: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    amount_dec = _to_decimal(amount, "amount")
+    if amount_dec <= Decimal("0.00"):
+        raise HTTPException(status_code=422, detail="amount must be > 0")
+
+    paid_total: Decimal = db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+    ).scalar_one()
+
+    # защита от переплаты
+    if paid_total + amount_dec > order.price:
+        payments = db.execute(
+            select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+        ).scalars().all()
+        client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+        balance = order.price - paid_total
+
+        return templates.TemplateResponse(
+            "order_detail.html",
+            {
+                "request": request,
+                "order": order,
+                "client": client,
+                "payments": payments,
+                "paid_total": paid_total,
+                "balance": balance,
+                "error": "Payment exceeds order price (overpay is not allowed).",
+            },
+            status_code=409,
+        )
+
+    p = Payment(order_id=order_id, amount=amount_dec)
+    db.add(p)
+    db.commit()
+
+    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)

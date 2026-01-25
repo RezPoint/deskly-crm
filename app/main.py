@@ -8,6 +8,7 @@ from .routes.clients import router as clients_router
 from .routes.orders import router as orders_router
 from .routes.payments import router as payments_router
 from .routes.export import router as export_router
+from .routes.ui import router as ui_router
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
@@ -25,6 +26,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.include_router(orders_router)
     app.include_router(payments_router)
     app.include_router(export_router)
+    app.include_router(ui_router) 
 
     @app.get("/", response_class=HTMLResponse)
     def home():

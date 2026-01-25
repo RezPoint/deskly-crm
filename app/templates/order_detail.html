@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% set title = "Order #" ~ order.id ~ " -- DesklyCRM" %}
+
+{% block content %}
+<h1>Order #{{ order.id }}</h1>
+
+<div class="card">
+  <div><b>Client:</b> {{ client.name if client else order.client_id }}</div>
+  <div><b>Title:</b> {{ order.title }}</div>
+  <div><b>Status:</b> {{ order.status }}</div>
+  <div><b>Price:</b> {{ order.price|money }}</div>
+  <div><b>Paid total:</b> {{ paid_total|money }}</div>
+  <div><b>Balance:</b> {{ balance|money }}</div>
+  {% if order.comment %}
+    <div class="muted"><b>Comment:</b> {{ order.comment }}</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>Add payment</h3>
+  <form method="post" action="/ui/orders/{{ order.id }}/payments" class="row">
+    <input name="amount" placeholder="Amount (e.g. 8000 or 8000.00)" required />
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Payments</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Amount</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in payments %}
+      <tr>
+        <td>{{ p.id }}</td>
+        <td>{{ p.amount|money }}</td>
+        <td class="muted">{{ p.created_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<p><a href="/ui/orders">← Back to orders</a></p>
+{% endblock %}

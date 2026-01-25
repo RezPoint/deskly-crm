@@ -5,3 +5,5 @@ sqlalchemy
 python-multipart
 pytest
 httpx
+jinja2
+python-multipart
