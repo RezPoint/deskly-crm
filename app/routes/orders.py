@@ -8,8 +8,12 @@ from sqlalchemy import select, func
 from ..db import get_db
 from ..models import Client, Order, Payment
 from ..schemas import (
-    OrderCreate, OrderOut, OrderStatus, OrderStatusUpdate,
-    OrderSummaryOut, OrderPriceUpdate
+    OrderCreate,
+    OrderOut,
+    OrderStatus,
+    OrderStatusUpdate,
+    OrderSummaryOut,
+    OrderPriceUpdate,
 )
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
@@ -50,12 +54,15 @@ def order_summary(order_id: int, db: Session = Depends(get_db)):
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
-    balance: Decimal = order.price - paid_total
+    # ВАЖНО: приводим к float, чтобы JSON отдавал числа, а не строки типа "15000.00"
+    price = float(order.price)
+    paid_total_f = float(paid_total)
+    balance = price - paid_total_f
 
     return {
         "order_id": order.id,
-        "price": order.price,
-        "paid_total": paid_total,
+        "price": price,
+        "paid_total": paid_total_f,
         "balance": balance,
     }
 
