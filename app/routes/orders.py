@@ -13,22 +13,29 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 @router.get("", response_model=List[OrderOut])
 def list_orders(db: Session = Depends(get_db)):
-    orders = db.execute(select(Order).order_by(Order.id.desc())).scalars().all()
-    return orders
+    return db.execute(select(Order).order_by(Order.id.desc())).scalars().all()
 
 
 @router.post("", response_model=OrderOut)
 def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
-    client = db.execute(select(Client).where(Client.id == payload.client_id)).scalar_one_or_none()
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
+    client_id = db.execute(
+        select(Client.id).where(Client.id == payload.client_id)
+    ).scalar_one_or_none()
+    if client_id is None:
+        raise HTTPException(status_code=404, detail="client not found")
+
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="title must not be empty")
+
+    comment = payload.comment.strip() if payload.comment else None
 
     o = Order(
         client_id=payload.client_id,
-        title=payload.title.strip(),
+        title=title,
         price=payload.price,
         status=payload.status.value,
-        comment=payload.comment,
+        comment=comment,
     )
     db.add(o)
     db.commit()
@@ -39,8 +46,8 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
 @router.patch("/{order_id}/status", response_model=OrderOut)
 def update_order_status(order_id: int, payload: OrderStatusUpdate, db: Session = Depends(get_db)):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
 
     order.status = payload.status.value
     db.commit()
