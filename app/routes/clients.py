@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_
 
@@ -13,7 +13,12 @@ router = APIRouter(prefix="/api/clients", tags=["clients"])
 
 @router.get("", response_model=List[ClientOut])
 def list_clients(
-    q: Optional[str] = Query(None, min_length=1, max_length=120, description="Search by name/phone/telegram"),
+    q: Optional[str] = Query(
+        None,
+        min_length=1,
+        max_length=120,
+        description="Search by name/phone/telegram",
+    ),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -35,7 +40,7 @@ def list_clients(
 
 
 @router.get("/{client_id}", response_model=ClientOut)
-def get_client(client_id: int = Query(..., ge=1), db: Session = Depends(get_db)):
+def get_client(client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     c = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
     if c is None:
         raise HTTPException(status_code=404, detail="client not found")
@@ -63,7 +68,10 @@ def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
     if conditions:
         exists = db.execute(select(Client.id).where(or_(*conditions))).scalar_one_or_none()
         if exists is not None:
-            raise HTTPException(status_code=409, detail="client with same phone/telegram already exists")
+            raise HTTPException(
+                status_code=409,
+                detail="client with same phone/telegram already exists",
+            )
 
     c = Client(
         name=name,
