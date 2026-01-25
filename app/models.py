@@ -1,8 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Numeric
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import relationship
-from datetime import datetime
 
 from .db import Base
+
+
+def utcnow():
+    return datetime.now(timezone.utc)
 
 
 class Client(Base):
@@ -13,7 +18,7 @@ class Client(Base):
     phone = Column(String(50), nullable=True)
     telegram = Column(String(80), nullable=True)
     notes = Column(String(1000), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     orders = relationship("Order", back_populates="client", cascade="all, delete-orphan")
 
@@ -28,7 +33,7 @@ class Order(Base):
     price = Column(Numeric(12, 2), nullable=False, default=0)
     status = Column(String(30), nullable=False, default="new")  # new/in_progress/done/canceled
     comment = Column(String(1000), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     client = relationship("Client", back_populates="orders")
     payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
@@ -41,6 +46,6 @@ class Payment(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
 
     amount = Column(Numeric(12, 2), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     order = relationship("Order", back_populates="payments")

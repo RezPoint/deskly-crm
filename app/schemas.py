@@ -1,17 +1,19 @@
-from pydantic import BaseModel, Field, condecimal, ConfigDict
-from typing import Optional
+from __future__ import annotations
+
 from datetime import datetime
-from enum import Enum
 from decimal import Decimal
+from enum import Enum
+from typing import Optional
 
+from pydantic import BaseModel, ConfigDict, Field, condecimal
 
-Money = condecimal(max_digits=12, decimal_places=2)  # тип для денег
+Money = condecimal(max_digits=12, decimal_places=2)
 
 
 class APIModel(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
-        json_encoders={Decimal: float},  # Decimal -> number в JSON, не строка
+        json_encoders={Decimal: float},  # Decimal -> number in JSON
     )
 
 

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from typing import Optional
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
@@ -13,25 +16,28 @@ from .routes.export import router as export_router
 from .routes.ui import router as ui_router
 
 
-def create_app(database_url: str | None = None) -> FastAPI:
-    app = FastAPI(title="DesklyCRM")
-
+def create_app(database_url: Optional[str] = None) -> FastAPI:
     engine = make_engine(database_url)
-    app.state.engine = engine
-    app.state.SessionLocal = make_sessionmaker(engine)
+    SessionLocal = make_sessionmaker(engine)
 
-    @app.on_event("startup")
-    def _startup():
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.engine = engine
+        app.state.SessionLocal = SessionLocal
         init_db(engine)
+        yield
 
-    # routers
+    app = FastAPI(title="DesklyCRM", lifespan=lifespan)
+
+    # API
     app.include_router(clients_router)
     app.include_router(orders_router)
     app.include_router(payments_router)
     app.include_router(export_router)
+
+    # UI
     app.include_router(ui_router)
 
-    # pages
     @app.get("/", response_class=HTMLResponse)
     def home():
         return """
@@ -46,11 +52,17 @@ def create_app(database_url: str | None = None) -> FastAPI:
   <h1>DesklyCRM</h1>
   <p>Status: It works &#x2705;</p>
 
-  <p><a href="/ui/clients">UI: Clients</a></p>
-  <p><a href="/ui/orders">UI: Orders</a></p>
+  <h3>UI</h3>
+  <ul>
+    <li><a href="/ui/clients">Clients</a></li>
+    <li><a href="/ui/orders">Orders</a></li>
+  </ul>
 
-  <p><a href="/health">Health check</a></p>
-  <p><a href="/docs">API Docs</a></p>
+  <h3>API</h3>
+  <ul>
+    <li><a href="/health">Health</a></li>
+    <li><a href="/docs">Swagger</a></li>
+  </ul>
 </body>
 </html>
 """
