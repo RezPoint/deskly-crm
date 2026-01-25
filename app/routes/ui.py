@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
@@ -60,11 +60,7 @@ def ui_clients(
 
     return templates.TemplateResponse(
         "clients.html",
-        {
-            "request": request,
-            "clients": clients,
-            "q": q or "",
-        },
+        {"request": request, "clients": clients, "q": q or "", "error": ""},
     )
 
 
@@ -94,7 +90,7 @@ def ui_create_client(
     telegram_clean = telegram.strip() if telegram else None
     notes_clean = notes.strip() if notes else None
 
-    # простая защита от дублей (как у тебя в API):
+    # простая защита от дублей: если совпадает phone ИЛИ telegram -- считаем дубль
     conditions = []
     if phone_clean:
         conditions.append(Client.phone == phone_clean)
@@ -102,7 +98,7 @@ def ui_create_client(
         conditions.append(Client.telegram == telegram_clean)
 
     if conditions:
-        exists = db.execute(select(Client.id).where(*conditions)).scalar_one_or_none()
+        exists = db.execute(select(Client.id).where(or_(*conditions))).scalar_one_or_none()
         if exists is not None:
             return templates.TemplateResponse(
                 "clients.html",
@@ -138,8 +134,6 @@ def ui_orders(
         stmt = stmt.where(Order.status == status)
 
     orders = db.execute(stmt).scalars().all()
-
-    # для отображения имени клиента
     client_map = {c.id: c for c in clients}
 
     return templates.TemplateResponse(
@@ -151,6 +145,7 @@ def ui_orders(
             "client_map": client_map,
             "filter_client_id": client_id,
             "filter_status": status or "",
+            "error": "",
         },
     )
 
@@ -272,6 +267,72 @@ def ui_add_payment(
 
     p = Payment(order_id=order_id, amount=amount_dec)
     db.add(p)
+    db.commit()
+
+    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
+
+
+@router.post("/orders/{order_id}/status")
+def ui_update_order_status(
+    order_id: int,
+    status: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    allowed = {"new", "in_progress", "done", "canceled"}
+    if status not in allowed:
+        raise HTTPException(status_code=422, detail="invalid status")
+
+    order.status = status
+    db.commit()
+
+    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
+
+
+@router.post("/orders/{order_id}/price")
+def ui_update_order_price(
+    request: Request,
+    order_id: int,
+    price: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    new_price = _to_decimal(price, "price")
+    if new_price < Decimal("0.00"):
+        raise HTTPException(status_code=422, detail="price must be >= 0")
+
+    paid_total: Decimal = db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+    ).scalar_one()
+
+    if new_price < paid_total:
+        payments = db.execute(
+            select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+        ).scalars().all()
+        client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+        balance = order.price - paid_total
+
+        return templates.TemplateResponse(
+            "order_detail.html",
+            {
+                "request": request,
+                "order": order,
+                "client": client,
+                "payments": payments,
+                "paid_total": paid_total,
+                "balance": balance,
+                "error": "New price cannot be below already paid total.",
+            },
+            status_code=409,
+        )
+
+    order.price = new_price
     db.commit()
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)

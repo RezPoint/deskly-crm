@@ -50,6 +50,8 @@ def create_app(database_url: str | None = None) -> FastAPI:
   <p><a href="/docs#/payments/create_payment_api_payments_post">Payments (Swagger)</a></p>
   <p><a href="/docs#/export/export_orders_csv_api_export_orders_csv_get">Export Orders CSV</a></p>
   <p><a href="/docs#/export/export_clients_csv_api_export_clients_csv_get">Export Clients CSV</a></p>
+  <p><a href="/ui/clients">UI: Clients</a></p>
+  <p><a href="/ui/orders">UI: Orders</a></p>
 </body>
 </html>
 """

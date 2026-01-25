@@ -11,9 +11,29 @@
   <div><b>Price:</b> {{ order.price|money }}</div>
   <div><b>Paid total:</b> {{ paid_total|money }}</div>
   <div><b>Balance:</b> {{ balance|money }}</div>
+
   {% if order.comment %}
     <div class="muted"><b>Comment:</b> {{ order.comment }}</div>
   {% endif %}
+
+  <hr/>
+
+  <h3>Update status</h3>
+  <form method="post" action="/ui/orders/{{ order.id }}/status" class="row">
+    <select name="status">
+      <option value="new" {% if order.status == "new" %}selected{% endif %}>new</option>
+      <option value="in_progress" {% if order.status == "in_progress" %}selected{% endif %}>in_progress</option>
+      <option value="done" {% if order.status == "done" %}selected{% endif %}>done</option>
+      <option value="canceled" {% if order.status == "canceled" %}selected{% endif %}>canceled</option>
+    </select>
+    <button type="submit">Save</button>
+  </form>
+
+  <h3>Update price</h3>
+  <form method="post" action="/ui/orders/{{ order.id }}/price" class="row">
+    <input name="price" value="{{ order.price|money }}" />
+    <button type="submit">Save</button>
+  </form>
 </div>
 
 <div class="card">
