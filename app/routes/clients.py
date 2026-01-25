@@ -15,6 +15,14 @@ def list_clients(db: Session = Depends(get_db)):
     return db.execute(select(Client).order_by(Client.id.desc())).scalars().all()
 
 
+@router.get("/{client_id}", response_model=ClientOut)
+def get_client(client_id: int, db: Session = Depends(get_db)):
+    c = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
+    if c is None:
+        raise HTTPException(status_code=404, detail="client not found")
+    return c
+
+
 @router.post("", response_model=ClientOut)
 def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
     name = payload.name.strip()

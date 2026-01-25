@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -12,8 +12,25 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 
 @router.get("", response_model=List[OrderOut])
-def list_orders(db: Session = Depends(get_db)):
-    return db.execute(select(Order).order_by(Order.id.desc())).scalars().all()
+def list_orders(
+    client_id: Optional[int] = None,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    q = select(Order).order_by(Order.id.desc())
+    if client_id is not None:
+        q = q.where(Order.client_id == client_id)
+    if status is not None:
+        q = q.where(Order.status == status)
+    return db.execute(q).scalars().all()
+
+
+@router.get("/{order_id}", response_model=OrderOut)
+def get_order(order_id: int, db: Session = Depends(get_db)):
+    o = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if o is None:
+        raise HTTPException(status_code=404, detail="order not found")
+    return o
 
 
 @router.post("", response_model=OrderOut)
