@@ -1,13 +1,11 @@
-from __future__ import annotations
-
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 
 from ..db import get_db
-from ..models import Order, Payment
+from ..models import Payment, Order
 from ..schemas import PaymentCreate, PaymentOut
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
@@ -23,6 +21,7 @@ def create_payment(payload: PaymentCreate, db: Session = Depends(get_db)):
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == payload.order_id)
     ).scalar_one()
 
+    # защита от переплаты (с учетом Decimal)
     if paid_total + payload.amount > order.price:
         raise HTTPException(status_code=409, detail="payment exceeds order remaining balance")
 
@@ -38,4 +37,3 @@ def list_payments_by_order(order_id: int, db: Session = Depends(get_db)):
     return db.execute(
         select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
     ).scalars().all()
-    

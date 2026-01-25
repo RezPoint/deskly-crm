@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from ..db import get_db
-from ..models import Client, Order, Payment, OrderExtra
+from ..models import Client, Order, Payment
 
 router = APIRouter(prefix="/ui", tags=["ui"])
 
@@ -40,18 +40,6 @@ def _to_decimal(s: str, field_name: str) -> Decimal:
     except (InvalidOperation, AttributeError):
         raise HTTPException(status_code=422, detail=f"{field_name} must be a number")
     return d
-
-
-def _paid_total(db: Session, order_id: int) -> Decimal:
-    return db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
-    ).scalar_one()
-
-
-def _extras_total(db: Session, order_id: int) -> Decimal:
-    return db.execute(
-        select(func.coalesce(func.sum(OrderExtra.amount), 0)).where(OrderExtra.order_id == order_id)
-    ).scalar_one()
 
 
 @router.get("/clients")
@@ -102,7 +90,7 @@ def ui_create_client(
     telegram_clean = telegram.strip() if telegram else None
     notes_clean = notes.strip() if notes else None
 
-    # защита от дублей: phone ИЛИ telegram совпали => дубль
+    # простая защита от дублей: если совпадает phone ИЛИ telegram -- считаем дубль
     conditions = []
     if phone_clean:
         conditions.append(Client.phone == phone_clean)
@@ -189,7 +177,7 @@ def ui_create_order(
     o = Order(
         client_id=client_id,
         title=title_clean,
-        price=price_dec,        # base price
+        price=price_dec,
         status=status,
         comment=comment_clean,
     )
@@ -216,15 +204,11 @@ def ui_order_detail(
         select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
     ).scalars().all()
 
-    extras = db.execute(
-        select(OrderExtra).where(OrderExtra.order_id == order_id).order_by(OrderExtra.id.desc())
-    ).scalars().all()
+    paid_total: Decimal = db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+    ).scalar_one()
 
-    paid_total = _paid_total(db, order_id)
-    extras_total = _extras_total(db, order_id)
-
-    total_price = order.price + extras_total
-    balance = total_price - paid_total
+    balance: Decimal = order.price - paid_total
 
     return templates.TemplateResponse(
         "order_detail.html",
@@ -233,10 +217,7 @@ def ui_order_detail(
             "order": order,
             "client": client,
             "payments": payments,
-            "extras": extras,
             "paid_total": paid_total,
-            "extras_total": extras_total,
-            "total_price": total_price,
             "balance": balance,
             "error": "",
         },
@@ -258,20 +239,17 @@ def ui_add_payment(
     if amount_dec <= Decimal("0.00"):
         raise HTTPException(status_code=422, detail="amount must be > 0")
 
-    paid_total = _paid_total(db, order_id)
-    extras_total = _extras_total(db, order_id)
-    total_price = order.price + extras_total
+    paid_total: Decimal = db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+    ).scalar_one()
 
-    # защита от переплаты по TOTAL PRICE
-    if paid_total + amount_dec > total_price:
+    # защита от переплаты
+    if paid_total + amount_dec > order.price:
         payments = db.execute(
             select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
         ).scalars().all()
-        extras = db.execute(
-            select(OrderExtra).where(OrderExtra.order_id == order_id).order_by(OrderExtra.id.desc())
-        ).scalars().all()
         client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
-        balance = total_price - paid_total
+        balance = order.price - paid_total
 
         return templates.TemplateResponse(
             "order_detail.html",
@@ -280,43 +258,15 @@ def ui_add_payment(
                 "order": order,
                 "client": client,
                 "payments": payments,
-                "extras": extras,
                 "paid_total": paid_total,
-                "extras_total": extras_total,
-                "total_price": total_price,
                 "balance": balance,
-                "error": "Payment exceeds total order price (base + extras).",
+                "error": "Payment exceeds order price (overpay is not allowed).",
             },
             status_code=409,
         )
 
     p = Payment(order_id=order_id, amount=amount_dec)
     db.add(p)
-    db.commit()
-
-    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
-
-
-@router.post("/orders/{order_id}/extras")
-def ui_add_extra(
-    request: Request,
-    order_id: int,
-    amount: str = Form(...),
-    reason: Optional[str] = Form(None),
-    db: Session = Depends(get_db),
-):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
-    if order is None:
-        raise HTTPException(status_code=404, detail="order not found")
-
-    amount_dec = _to_decimal(amount, "amount")
-    if amount_dec <= Decimal("0.00"):
-        raise HTTPException(status_code=422, detail="amount must be > 0")
-
-    reason_clean = reason.strip() if reason else None
-
-    e = OrderExtra(order_id=order_id, amount=amount_dec, reason=reason_clean)
-    db.add(e)
     db.commit()
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
@@ -357,22 +307,16 @@ def ui_update_order_price(
     if new_price < Decimal("0.00"):
         raise HTTPException(status_code=422, detail="price must be >= 0")
 
-    paid_total = _paid_total(db, order_id)
-    extras_total = _extras_total(db, order_id)
+    paid_total: Decimal = db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+    ).scalar_one()
 
-    # Нельзя сделать TOTAL PRICE меньше уже оплаченного
-    new_total_price = new_price + extras_total
-    if new_total_price < paid_total:
+    if new_price < paid_total:
         payments = db.execute(
             select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
         ).scalars().all()
-        extras = db.execute(
-            select(OrderExtra).where(OrderExtra.order_id == order_id).order_by(OrderExtra.id.desc())
-        ).scalars().all()
         client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
-
-        total_price = order.price + extras_total
-        balance = total_price - paid_total
+        balance = order.price - paid_total
 
         return templates.TemplateResponse(
             "order_detail.html",
@@ -381,12 +325,9 @@ def ui_update_order_price(
                 "order": order,
                 "client": client,
                 "payments": payments,
-                "extras": extras,
                 "paid_total": paid_total,
-                "extras_total": extras_total,
-                "total_price": total_price,
                 "balance": balance,
-                "error": "New base price makes total price below already paid total.",
+                "error": "New price cannot be below already paid total.",
             },
             status_code=409,
         )
@@ -394,4 +335,23 @@ def ui_update_order_price(
     order.price = new_price
     db.commit()
 
+    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
+    
+    
+@router.post("/orders/{order_id}/status")
+def ui_update_order_status(
+    order_id: int,
+    status: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    allowed = {"new", "in_progress", "done", "canceled"}
+    if status not in allowed:
+        raise HTTPException(status_code=422, detail="invalid status")
+
+    order.status = status
+    db.commit()
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
