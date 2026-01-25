@@ -8,7 +8,6 @@ from .routes.clients import router as clients_router
 from .routes.orders import router as orders_router
 from .routes.payments import router as payments_router
 from .routes.export import router as export_router
-from .app_factory import create_app
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
