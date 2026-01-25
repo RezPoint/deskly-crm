@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import List, Optional
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 
 from ..db import get_db
 from ..models import Client, Order, Payment
 from ..schemas import (
     OrderCreate,
     OrderOut,
-    OrderPriceUpdate,
     OrderStatus,
     OrderStatusUpdate,
     OrderSummaryOut,
+    OrderPriceUpdate,
 )
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
@@ -56,14 +56,15 @@ def order_summary(order_id: int, db: Session = Depends(get_db)):
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
-    balance: Decimal = order.price - paid_total
+    price_dec: Decimal = order.price
+    balance_dec: Decimal = price_dec - paid_total
 
-    # ВАЖНО: ключи должны быть ровно такие, как ждёт тест: price/paid_total/balance
+    # ВАЖНО: отдаём числа, а не строки (для тестов)
     return {
         "order_id": order.id,
-        "price": order.price,
-        "paid_total": paid_total,
-        "balance": balance,
+        "price": float(price_dec),
+        "paid_total": float(paid_total),
+        "balance": float(balance_dec),
     }
 
 
@@ -82,7 +83,7 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     o = Order(
         client_id=payload.client_id,
         title=title,
-        price=payload.price,
+        price=payload.price,              # MoneyIn (Decimal) -> в базе Decimal
         status=payload.status.value,
         comment=comment,
     )
@@ -114,6 +115,7 @@ def update_order_price(order_id: int, payload: OrderPriceUpdate, db: Session = D
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
+    # нельзя уменьшить цену ниже уже оплаченной суммы
     if payload.price < paid_total:
         raise HTTPException(status_code=409, detail="new price is below already paid total")
 
