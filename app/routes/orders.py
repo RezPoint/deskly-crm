@@ -40,10 +40,10 @@ def list_orders(
 
 @router.get("/{order_id}", response_model=OrderOut)
 def get_order(order_id: int, db: Session = Depends(get_db)):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
-    if order is None:
+    o = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if o is None:
         raise HTTPException(status_code=404, detail="order not found")
-    return order
+    return o
 
 
 @router.get("/{order_id}/summary", response_model=OrderSummaryOut)
@@ -58,7 +58,7 @@ def order_summary(order_id: int, db: Session = Depends(get_db)):
 
     balance: Decimal = order.price - paid_total
 
-    # ВАЖНО: ключи строго такие, как ждёт тест: price / paid_total / balance
+    # ВАЖНО: ключи должны быть ровно такие, как ждёт тест: price/paid_total/balance
     return {
         "order_id": order.id,
         "price": order.price,
@@ -79,17 +79,17 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
 
     comment = payload.comment.strip() if payload.comment else None
 
-    order = Order(
+    o = Order(
         client_id=payload.client_id,
         title=title,
         price=payload.price,
         status=payload.status.value,
         comment=comment,
     )
-    db.add(order)
+    db.add(o)
     db.commit()
-    db.refresh(order)
-    return order
+    db.refresh(o)
+    return o
 
 
 @router.patch("/{order_id}/status", response_model=OrderOut)

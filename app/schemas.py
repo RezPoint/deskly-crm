@@ -10,12 +10,9 @@ from pydantic import BaseModel, Field, ConfigDict, condecimal
 Money = condecimal(max_digits=12, decimal_places=2)
 
 
-# Базовая конфигурация: ORM + Decimal -> number в JSON
-class ORMModel(BaseModel):
-    model_config = ConfigDict(
-        from_attributes=True,
-        json_encoders={Decimal: lambda v: float(v)},
-    )
+class ORMOut(BaseModel):
+    # важно: Decimal -> float, чтобы в JSON было число, а не строка
+    model_config = ConfigDict(from_attributes=True, json_encoders={Decimal: float})
 
 
 class ClientCreate(BaseModel):
@@ -25,7 +22,7 @@ class ClientCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class ClientOut(ORMModel):
+class ClientOut(ORMOut):
     id: int
     name: str
     phone: Optional[str] = None
@@ -44,12 +41,12 @@ class OrderStatus(str, Enum):
 class OrderCreate(BaseModel):
     client_id: int = Field(..., ge=1)
     title: str = Field(..., min_length=1, max_length=200)
-    price: Money = Field(Decimal("0.00"), ge=Decimal("0.00"))
+    price: Money = Field(default=Decimal("0.00"), ge=Decimal("0.00"))
     status: OrderStatus = OrderStatus.new
     comment: Optional[str] = None
 
 
-class OrderOut(ORMModel):
+class OrderOut(ORMOut):
     id: int
     client_id: int
     title: str
@@ -67,7 +64,7 @@ class OrderPriceUpdate(BaseModel):
     price: Money = Field(..., ge=Decimal("0.00"))
 
 
-class OrderSummaryOut(ORMModel):
+class OrderSummaryOut(ORMOut):
     order_id: int
     price: Money
     paid_total: Money
@@ -79,7 +76,7 @@ class PaymentCreate(BaseModel):
     amount: Money = Field(..., gt=Decimal("0.00"))
 
 
-class PaymentOut(ORMModel):
+class PaymentOut(ORMOut):
     id: int
     order_id: int
     amount: Money
