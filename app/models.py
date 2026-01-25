@@ -19,6 +19,7 @@ class Client(Base):
 
 
 class Order(Base):
+    payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -42,5 +43,17 @@ class Payment(Base):
 
     amount = Column(Numeric(12, 2), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    order = relationship("Order", back_populates="payments")
+    
+    
+ class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
+
+    amount = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     order = relationship("Order", back_populates="payments")
