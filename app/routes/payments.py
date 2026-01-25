@@ -1,14 +1,26 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
 
 from ..db import get_db
-from ..models import Payment, Order
+from ..models import Order, OrderExtra, Payment
 from ..schemas import PaymentCreate, PaymentOut
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
+
+
+def _paid_total(db: Session, order_id: int) -> Decimal:
+    return db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+    ).scalar_one()
+
+
+def _extras_total(db: Session, order_id: int) -> Decimal:
+    return db.execute(
+        select(func.coalesce(func.sum(OrderExtra.amount), 0)).where(OrderExtra.order_id == order_id)
+    ).scalar_one()
 
 
 @router.post("", response_model=PaymentOut)
@@ -17,13 +29,13 @@ def create_payment(payload: PaymentCreate, db: Session = Depends(get_db)):
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
-    paid_total: Decimal = db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == payload.order_id)
-    ).scalar_one()
+    paid_total = _paid_total(db, payload.order_id)
+    extras_total = _extras_total(db, payload.order_id)
 
-    # защита от переплаты (с учетом Decimal)
-    if paid_total + payload.amount > order.price:
-        raise HTTPException(status_code=409, detail="payment exceeds order remaining balance")
+    total_price: Decimal = order.price + extras_total
+
+    if paid_total + payload.amount > total_price:
+        raise HTTPException(status_code=409, detail="payment would exceed total order price")
 
     p = Payment(order_id=payload.order_id, amount=payload.amount)
     db.add(p)

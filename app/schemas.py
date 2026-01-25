@@ -11,13 +11,10 @@ Money = condecimal(max_digits=12, decimal_places=2)
 
 
 class APIModel(BaseModel):
-    model_config = ConfigDict(
-        from_attributes=True,
-        json_encoders={Decimal: float},  # Decimal -> number in JSON
-    )
+    model_config = ConfigDict(from_attributes=True)
 
 
-class ClientCreate(APIModel):
+class ClientCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     phone: Optional[str] = None
     telegram: Optional[str] = None
@@ -40,8 +37,8 @@ class OrderStatus(str, Enum):
     canceled = "canceled"
 
 
-class OrderCreate(APIModel):
-    client_id: int
+class OrderCreate(BaseModel):
+    client_id: int = Field(..., ge=1)
     title: str = Field(..., min_length=1, max_length=200)
     price: Money = Field(Decimal("0.00"))
     status: OrderStatus = OrderStatus.new
@@ -58,22 +55,15 @@ class OrderOut(APIModel):
     created_at: datetime
 
 
-class OrderStatusUpdate(APIModel):
+class OrderStatusUpdate(BaseModel):
     status: OrderStatus
 
 
-class OrderPriceUpdate(APIModel):
+class OrderPriceUpdate(BaseModel):
     price: Money = Field(..., ge=Decimal("0.00"))
 
 
-class OrderSummaryOut(APIModel):
-    order_id: int
-    price: Money
-    paid_total: Money
-    balance: Money
-
-
-class PaymentCreate(APIModel):
+class PaymentCreate(BaseModel):
     order_id: int = Field(..., ge=1)
     amount: Money = Field(..., gt=Decimal("0.00"))
 
@@ -83,3 +73,25 @@ class PaymentOut(APIModel):
     order_id: int
     amount: Money
     created_at: datetime
+
+
+class OrderExtraCreate(BaseModel):
+    amount: Money = Field(..., gt=Decimal("0.00"))
+    reason: Optional[str] = Field(None, max_length=300)
+
+
+class OrderExtraOut(APIModel):
+    id: int
+    order_id: int
+    amount: Money
+    reason: Optional[str] = None
+    created_at: datetime
+
+
+class OrderSummaryOut(APIModel):
+    order_id: int
+    base_price: Money
+    extras_total: Money
+    total_price: Money
+    paid_total: Money
+    balance: Money

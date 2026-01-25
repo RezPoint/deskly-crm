@@ -30,13 +30,14 @@ class Order(Base):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
 
     title = Column(String(200), nullable=False)
-    price = Column(Numeric(12, 2), nullable=False, default=0)
+    price = Column(Numeric(12, 2), nullable=False, default=0)  # base price
     status = Column(String(30), nullable=False, default="new")  # new/in_progress/done/canceled
     comment = Column(String(1000), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     client = relationship("Client", back_populates="orders")
     payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
+    extras = relationship("OrderExtra", back_populates="order", cascade="all, delete-orphan")
 
 
 class Payment(Base):
@@ -49,3 +50,16 @@ class Payment(Base):
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     order = relationship("Order", back_populates="payments")
+
+
+class OrderExtra(Base):
+    __tablename__ = "order_extras"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
+
+    amount = Column(Numeric(12, 2), nullable=False)  # > 0
+    reason = Column(String(300), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    order = relationship("Order", back_populates="extras")

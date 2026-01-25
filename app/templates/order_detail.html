@@ -8,7 +8,11 @@
   <div><b>Client:</b> {{ client.name if client else order.client_id }}</div>
   <div><b>Title:</b> {{ order.title }}</div>
   <div><b>Status:</b> {{ order.status }}</div>
-  <div><b>Price:</b> {{ order.price|money }}</div>
+
+  <div><b>Base price:</b> {{ order.price|money }}</div>
+  <div><b>Extras total:</b> {{ extras_total|money }}</div>
+  <div><b>Total price:</b> {{ total_price|money }}</div>
+
   <div><b>Paid total:</b> {{ paid_total|money }}</div>
   <div><b>Balance:</b> {{ balance|money }}</div>
 
@@ -35,11 +39,44 @@
     <button type="submit">Save</button>
   </form>
 
-  <h3>Update price</h3>
+  <h3>Update base price</h3>
   <form method="post" action="/ui/orders/{{ order.id }}/price" class="row">
     <input name="price" value="{{ order.price|money }}" />
     <button type="submit">Save</button>
   </form>
+</div>
+
+<div class="card">
+  <h3>Add extra (additional work / revisions)</h3>
+  <form method="post" action="/ui/orders/{{ order.id }}/extras" class="row">
+    <input name="amount" placeholder="Amount (e.g. 3000 or 3000.00)" required />
+    <input name="reason" placeholder="Reason (optional)" />
+    <button type="submit">Add extra</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Extras</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Amount</th>
+        <th>Reason</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for e in extras %}
+      <tr>
+        <td>{{ e.id }}</td>
+        <td>{{ e.amount|money }}</td>
+        <td class="muted">{{ e.reason or "" }}</td>
+        <td class="muted">{{ e.created_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <div class="card">
