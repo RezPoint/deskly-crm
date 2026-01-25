@@ -55,9 +55,9 @@ class OrderStatusUpdate(BaseModel):
     status: OrderStatus
     
     
- class PaymentCreate(BaseModel):
+class PaymentCreate(BaseModel):
+    order_id: int
     amount: float = Field(..., gt=0)
-
 
 class PaymentOut(BaseModel):
     id: int
@@ -67,10 +67,3 @@ class PaymentOut(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class OrderFinanceOut(BaseModel):
-    order_id: int
-    price: float
-    paid_total: float
-    balance_due: float
