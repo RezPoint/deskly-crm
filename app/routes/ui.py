@@ -336,3 +336,22 @@ def ui_update_order_price(
     db.commit()
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
+    
+    
+@router.post("/orders/{order_id}/status")
+def ui_update_order_status(
+    order_id: int,
+    status: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    allowed = {"new", "in_progress", "done", "canceled"}
+    if status not in allowed:
+        raise HTTPException(status_code=422, detail="invalid status")
+
+    order.status = status
+    db.commit()
+    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
