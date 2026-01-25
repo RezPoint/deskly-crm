@@ -5,13 +5,17 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, condecimal
+from pydantic import BaseModel, Field, ConfigDict, condecimal
 
 Money = condecimal(max_digits=12, decimal_places=2)
 
 
-class APIModel(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+# Базовая конфигурация: ORM + Decimal -> number в JSON
+class ORMModel(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={Decimal: lambda v: float(v)},
+    )
 
 
 class ClientCreate(BaseModel):
@@ -21,7 +25,7 @@ class ClientCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class ClientOut(APIModel):
+class ClientOut(ORMModel):
     id: int
     name: str
     phone: Optional[str] = None
@@ -40,12 +44,12 @@ class OrderStatus(str, Enum):
 class OrderCreate(BaseModel):
     client_id: int = Field(..., ge=1)
     title: str = Field(..., min_length=1, max_length=200)
-    price: Money = Field(Decimal("0.00"))
+    price: Money = Field(Decimal("0.00"), ge=Decimal("0.00"))
     status: OrderStatus = OrderStatus.new
     comment: Optional[str] = None
 
 
-class OrderOut(APIModel):
+class OrderOut(ORMModel):
     id: int
     client_id: int
     title: str
@@ -63,35 +67,20 @@ class OrderPriceUpdate(BaseModel):
     price: Money = Field(..., ge=Decimal("0.00"))
 
 
+class OrderSummaryOut(ORMModel):
+    order_id: int
+    price: Money
+    paid_total: Money
+    balance: Money
+
+
 class PaymentCreate(BaseModel):
     order_id: int = Field(..., ge=1)
     amount: Money = Field(..., gt=Decimal("0.00"))
 
 
-class PaymentOut(APIModel):
+class PaymentOut(ORMModel):
     id: int
     order_id: int
     amount: Money
     created_at: datetime
-
-
-class OrderExtraCreate(BaseModel):
-    amount: Money = Field(..., gt=Decimal("0.00"))
-    reason: Optional[str] = Field(None, max_length=300)
-
-
-class OrderExtraOut(APIModel):
-    id: int
-    order_id: int
-    amount: Money
-    reason: Optional[str] = None
-    created_at: datetime
-
-
-class OrderSummaryOut(APIModel):
-    order_id: int
-    base_price: Money
-    extras_total: Money
-    total_price: Money
-    paid_total: Money
-    balance: Money
