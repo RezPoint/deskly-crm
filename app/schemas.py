@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, condecimal
+from pydantic import BaseModel, Field, condecimal, ConfigDict
 from typing import Optional
 from datetime import datetime
 from enum import Enum
@@ -8,23 +8,27 @@ from decimal import Decimal
 Money = condecimal(max_digits=12, decimal_places=2)  # тип для денег
 
 
-class ClientCreate(BaseModel):
+class APIModel(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={Decimal: float},  # Decimal -> number в JSON, не строка
+    )
+
+
+class ClientCreate(APIModel):
     name: str = Field(..., min_length=1, max_length=120)
     phone: Optional[str] = None
     telegram: Optional[str] = None
     notes: Optional[str] = None
 
 
-class ClientOut(BaseModel):
+class ClientOut(APIModel):
     id: int
     name: str
     phone: Optional[str] = None
     telegram: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class OrderStatus(str, Enum):
@@ -34,7 +38,7 @@ class OrderStatus(str, Enum):
     canceled = "canceled"
 
 
-class OrderCreate(BaseModel):
+class OrderCreate(APIModel):
     client_id: int
     title: str = Field(..., min_length=1, max_length=200)
     price: Money = Field(Decimal("0.00"))
@@ -42,7 +46,7 @@ class OrderCreate(BaseModel):
     comment: Optional[str] = None
 
 
-class OrderOut(BaseModel):
+class OrderOut(APIModel):
     id: int
     client_id: int
     title: str
@@ -51,35 +55,29 @@ class OrderOut(BaseModel):
     comment: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
-
-class OrderStatusUpdate(BaseModel):
+class OrderStatusUpdate(APIModel):
     status: OrderStatus
 
 
-class OrderPriceUpdate(BaseModel):
+class OrderPriceUpdate(APIModel):
     price: Money = Field(..., ge=Decimal("0.00"))
 
 
-class OrderSummaryOut(BaseModel):
+class OrderSummaryOut(APIModel):
     order_id: int
     price: Money
     paid_total: Money
     balance: Money
 
 
-class PaymentCreate(BaseModel):
+class PaymentCreate(APIModel):
     order_id: int = Field(..., ge=1)
     amount: Money = Field(..., gt=Decimal("0.00"))
 
 
-class PaymentOut(BaseModel):
+class PaymentOut(APIModel):
     id: int
     order_id: int
     amount: Money
     created_at: datetime
-
-    class Config:
-        from_attributes = True
