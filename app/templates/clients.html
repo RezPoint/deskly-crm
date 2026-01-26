@@ -7,6 +7,12 @@
 <div class="card">
   <form method="get" action="/ui/clients" class="row">
     <input name="q" placeholder="Search name/phone/telegram" value="{{ q }}" />
+    <select name="sort">
+      <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
+      <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
+      <option value="name_asc" {% if filter_sort == "name_asc" %}selected{% endif %}>Name A→Z</option>
+      <option value="name_desc" {% if filter_sort == "name_desc" %}selected{% endif %}>Name Z→A</option>
+    </select>
     <button type="submit">Search</button>
     <a class="muted" href="/ui/clients">Reset</a>
   </form>
@@ -53,5 +59,14 @@
     {% endfor %}
     </tbody>
   </table>
+  <div class="row">
+    <span class="muted">Page {{ page }} / {{ total_pages }}</span>
+    {% if page > 1 %}
+      <a href="/ui/clients?q={{ q }}&sort={{ filter_sort }}&page={{ page - 1 }}&page_size={{ page_size }}">Prev</a>
+    {% endif %}
+    {% if page < total_pages %}
+      <a href="/ui/clients?q={{ q }}&sort={{ filter_sort }}&page={{ page + 1 }}&page_size={{ page_size }}">Next</a>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

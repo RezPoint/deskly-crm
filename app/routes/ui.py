@@ -57,12 +57,22 @@ def _render_orders(
     client_id: Optional[int] = None,
     status: Optional[str] = None,
     q: Optional[str] = None,
+    sort: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
     error: str = "",
     status_code: int = 200,
 ):
     clients = db.execute(select(Client).order_by(Client.name.asc())).scalars().all()
 
-    stmt = select(Order).order_by(Order.id.desc())
+    if sort == "created_asc":
+        stmt = select(Order).order_by(Order.id.asc())
+    elif sort == "price_desc":
+        stmt = select(Order).order_by(Order.price.desc(), Order.id.desc())
+    elif sort == "price_asc":
+        stmt = select(Order).order_by(Order.price.asc(), Order.id.asc())
+    else:
+        stmt = select(Order).order_by(Order.id.desc())
     if client_id:
         stmt = stmt.where(Order.client_id == client_id)
     if status:
@@ -71,8 +81,13 @@ def _render_orders(
         like = f"%{q.strip()}%"
         stmt = stmt.where((Order.title.ilike(like)) | (Order.comment.ilike(like)))
 
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    page_size = max(1, min(page_size, 200))
+    page = max(1, page)
+    stmt = stmt.limit(page_size).offset((page - 1) * page_size)
     orders = db.execute(stmt).scalars().all()
     client_map = {c.id: c for c in clients}
+    total_pages = max(1, (total + page_size - 1) // page_size)
 
     return templates.TemplateResponse(
         request,
@@ -85,6 +100,10 @@ def _render_orders(
             "filter_client_id": client_id,
             "filter_status": status or "",
             "filter_q": q or "",
+            "filter_sort": sort or "created_desc",
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
             "error": error,
         },
         status_code=status_code,
@@ -95,9 +114,19 @@ def _render_orders(
 def ui_clients(
     request: Request,
     q: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Client).order_by(Client.id.desc())
+    if sort == "created_asc":
+        stmt = select(Client).order_by(Client.id.asc())
+    elif sort == "name_asc":
+        stmt = select(Client).order_by(Client.name.asc())
+    elif sort == "name_desc":
+        stmt = select(Client).order_by(Client.name.desc())
+    else:
+        stmt = select(Client).order_by(Client.id.desc())
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -105,12 +134,26 @@ def ui_clients(
             | (Client.phone.like(like))
             | (Client.telegram.like(like))
         )
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    page_size = max(1, min(page_size, 200))
+    page = max(1, page)
+    stmt = stmt.limit(page_size).offset((page - 1) * page_size)
     clients = db.execute(stmt).scalars().all()
+    total_pages = max(1, (total + page_size - 1) // page_size)
 
     return templates.TemplateResponse(
         request,
         "clients.html",
-        {"request": request, "clients": clients, "q": q or "", "error": ""},
+        {
+            "request": request,
+            "clients": clients,
+            "q": q or "",
+            "filter_sort": sort or "created_desc",
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "error": "",
+        },
     )
 
 
@@ -132,6 +175,10 @@ def ui_create_client(
                 "request": request,
                 "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
                 "q": "",
+                "filter_sort": "created_desc",
+                "page": 1,
+                "page_size": 50,
+                "total_pages": 1,
                 "error": "Name must not be empty",
             },
             status_code=422,
@@ -158,6 +205,10 @@ def ui_create_client(
                     "request": request,
                     "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
                     "q": "",
+                    "filter_sort": "created_desc",
+                    "page": 1,
+                    "page_size": 50,
+                    "total_pages": 1,
                     "error": "Client with same phone/telegram already exists",
                 },
                 status_code=409,
@@ -176,6 +227,10 @@ def ui_create_client(
                 "request": request,
                 "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
                 "q": "",
+                "filter_sort": "created_desc",
+                "page": 1,
+                "page_size": 50,
+                "total_pages": 1,
                 "error": "Client with same phone/telegram already exists",
             },
             status_code=409,
@@ -204,9 +259,21 @@ def ui_orders(
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    return _render_orders(request, db, client_id=client_id, status=status, q=q)
+    return _render_orders(
+        request,
+        db,
+        client_id=client_id,
+        status=status,
+        q=q,
+        sort=sort,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post("/orders")

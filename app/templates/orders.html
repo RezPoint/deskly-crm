@@ -8,6 +8,12 @@
   <h3>Filters</h3>
   <form method="get" action="/ui/orders" class="row">
     <input name="q" placeholder="Search title/comment" value="{{ filter_q }}" />
+    <select name="sort">
+      <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
+      <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
+      <option value="price_desc" {% if filter_sort == "price_desc" %}selected{% endif %}>Price high→low</option>
+      <option value="price_asc" {% if filter_sort == "price_asc" %}selected{% endif %}>Price low→high</option>
+    </select>
     <select name="client_id">
       <option value="">All clients</option>
       {% for c in clients %}
@@ -81,5 +87,14 @@
     {% endfor %}
     </tbody>
   </table>
+  <div class="row">
+    <span class="muted">Page {{ page }} / {{ total_pages }}</span>
+    {% if page > 1 %}
+      <a href="/ui/orders?q={{ filter_q }}&client_id={{ filter_client_id }}&status={{ filter_status }}&sort={{ filter_sort }}&page={{ page - 1 }}&page_size={{ page_size }}">Prev</a>
+    {% endif %}
+    {% if page < total_pages %}
+      <a href="/ui/orders?q={{ filter_q }}&client_id={{ filter_client_id }}&status={{ filter_status }}&sort={{ filter_sort }}&page={{ page + 1 }}&page_size={{ page_size }}">Next</a>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

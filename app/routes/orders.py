@@ -26,9 +26,17 @@ def list_orders(
     q: Optional[str] = Query(None, min_length=1, max_length=200),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    sort: str = Query("created_desc", pattern="^(created_desc|created_asc|price_desc|price_asc)$"),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Order).order_by(Order.id.desc())
+    if sort == "created_asc":
+        stmt = select(Order).order_by(Order.id.asc())
+    elif sort == "price_desc":
+        stmt = select(Order).order_by(Order.price.desc(), Order.id.desc())
+    elif sort == "price_asc":
+        stmt = select(Order).order_by(Order.price.asc(), Order.id.asc())
+    else:
+        stmt = select(Order).order_by(Order.id.desc())
 
     if client_id is not None:
         stmt = stmt.where(Order.client_id == client_id)
