@@ -5,6 +5,9 @@ on:
     branches: [ dev ]
   pull_request:
     branches: [ main ]
+    branches: [ "dev", "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   tests:
