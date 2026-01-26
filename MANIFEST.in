@@ -1,0 +1,3 @@
+recursive-include app/templates *.html
+recursive-include app/templates *.jinja
+recursive-include app/templates *.j2
