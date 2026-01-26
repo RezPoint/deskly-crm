@@ -40,6 +40,8 @@ def export_orders_csv(
     end_dt = _parse_date(date_to, "date_to", is_end=True)
     if status and status not in {"new", "in_progress", "done", "canceled"}:
         raise HTTPException(status_code=422, detail="status must be one of: new, in_progress, done, canceled")
+    if start_dt and end_dt and start_dt > end_dt:
+        raise HTTPException(status_code=422, detail="date_from must be <= date_to")
 
     # total paid per order
     paid_map = dict(
