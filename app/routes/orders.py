@@ -23,6 +23,8 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 def list_orders(
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[OrderStatus] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     q = select(Order).order_by(Order.id.desc())
@@ -33,6 +35,7 @@ def list_orders(
     if status is not None:
         q = q.where(Order.status == status.value)
 
+    q = q.limit(limit).offset(offset)
     return db.execute(q).scalars().all()
 
 
