@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Path as ApiPath
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, or_
 from sqlalchemy.orm import Session
@@ -172,6 +172,10 @@ def ui_create_order(
     if price_dec < Decimal("0.00"):
         raise HTTPException(status_code=422, detail="price must be >= 0")
 
+    allowed_statuses = {"new", "in_progress", "done", "canceled"}
+    if status not in allowed_statuses:
+        raise HTTPException(status_code=422, detail="invalid status")
+
     comment_clean = comment.strip() if comment else None
 
     o = Order(
@@ -191,7 +195,7 @@ def ui_create_order(
 @router.get("/orders/{order_id}")
 def ui_order_detail(
     request: Request,
-    order_id: int,
+    order_id: int = ApiPath(..., ge=1),
     db: Session = Depends(get_db),
 ):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
@@ -227,7 +231,7 @@ def ui_order_detail(
 @router.post("/orders/{order_id}/payments")
 def ui_add_payment(
     request: Request,
-    order_id: int,
+    order_id: int = ApiPath(..., ge=1),
     amount: str = Form(...),
     db: Session = Depends(get_db),
 ):
@@ -274,7 +278,7 @@ def ui_add_payment(
 
 @router.post("/orders/{order_id}/status")
 def ui_update_order_status(
-    order_id: int,
+    order_id: int = ApiPath(..., ge=1),
     status: str = Form(...),
     db: Session = Depends(get_db),
 ):
@@ -295,7 +299,7 @@ def ui_update_order_status(
 @router.post("/orders/{order_id}/price")
 def ui_update_order_price(
     request: Request,
-    order_id: int,
+    order_id: int = ApiPath(..., ge=1),
     price: str = Form(...),
     db: Session = Depends(get_db),
 ):
@@ -335,23 +339,4 @@ def ui_update_order_price(
     order.price = new_price
     db.commit()
 
-    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
-    
-    
-@router.post("/orders/{order_id}/status")
-def ui_update_order_status(
-    order_id: int,
-    status: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
-    if order is None:
-        raise HTTPException(status_code=404, detail="order not found")
-
-    allowed = {"new", "in_progress", "done", "canceled"}
-    if status not in allowed:
-        raise HTTPException(status_code=422, detail="invalid status")
-
-    order.status = status
-    db.commit()
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)

@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
@@ -33,7 +33,10 @@ def create_payment(payload: PaymentCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/by-order/{order_id}", response_model=list[PaymentOut])
-def list_payments_by_order(order_id: int, db: Session = Depends(get_db)):
+def list_payments_by_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+    order = db.execute(select(Order.id).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
     return db.execute(
         select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
     ).scalars().all()
