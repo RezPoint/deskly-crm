@@ -153,6 +153,11 @@ def _render_orders(
             "client_map": client_map,
             "paid_map": paid_map,
             "totals": totals,
+            "filter_summary": {
+                "price": totals["price"],
+                "paid_total": totals["paid"],
+                "balance": totals["balance"],
+            },
             "filter_client_id": client_id,
             "filter_status": status or "",
             "filter_q": q or "",

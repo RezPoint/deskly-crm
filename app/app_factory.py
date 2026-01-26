@@ -73,6 +73,6 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
 
     @app.get("/health")
     def health():
-        return {"status": "ok"}
+        return {"status": "ok", "service": "deskly-crm"}
 
     return app
