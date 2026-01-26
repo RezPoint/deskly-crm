@@ -1,5 +1,9 @@
 # DesklyCRM
 
+[![CI](https://github.com/RezPoint/deskly-crm/actions/workflows/ci.yml/badge.svg)](https://github.com/RezPoint/deskly-crm/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml/badge.svg)](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/RezPoint/deskly-crm)](https://github.com/RezPoint/deskly-crm/releases)
+
 DesklyCRM is a lightweight client & order manager for freelancers and small businesses — track requests, statuses, payments, and export reports in CSV.
 
 ## Why DesklyCRM
