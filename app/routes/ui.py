@@ -179,6 +179,20 @@ def ui_create_client(
     return RedirectResponse(url="/ui/clients", status_code=303)
 
 
+@router.post("/clients/{client_id}/delete")
+def ui_delete_client(
+    request: Request,
+    client_id: int,
+    db: Session = Depends(get_db),
+):
+    client = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
+    if client is None:
+        raise HTTPException(status_code=404, detail="client not found")
+    db.delete(client)
+    db.commit()
+    return RedirectResponse(url="/ui/clients", status_code=303)
+
+
 @router.get("/orders")
 def ui_orders(
     request: Request,
@@ -249,6 +263,20 @@ def ui_create_order(
     db.refresh(o)
 
     return RedirectResponse(url=f"/ui/orders/{o.id}", status_code=303)
+
+
+@router.post("/orders/{order_id}/delete")
+def ui_delete_order(
+    request: Request,
+    order_id: int,
+    db: Session = Depends(get_db),
+):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+    db.delete(order)
+    db.commit()
+    return RedirectResponse(url="/ui/orders", status_code=303)
 
 
 @router.get("/orders/{order_id}")
@@ -338,6 +366,21 @@ def ui_add_payment(
     db.add(p)
     db.commit()
 
+    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
+
+
+@router.post("/payments/{payment_id}/delete")
+def ui_delete_payment(
+    request: Request,
+    payment_id: int,
+    db: Session = Depends(get_db),
+):
+    payment = db.execute(select(Payment).where(Payment.id == payment_id)).scalar_one_or_none()
+    if payment is None:
+        raise HTTPException(status_code=404, detail="payment not found")
+    order_id = payment.order_id
+    db.delete(payment)
+    db.commit()
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
 
