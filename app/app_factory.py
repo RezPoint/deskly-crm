@@ -9,6 +9,9 @@ from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse, Response
+from sqlalchemy import text
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from .db import init_db, make_engine, make_sessionmaker, run_migrations
 from . import models  # noqa: F401
@@ -18,6 +21,18 @@ from .routes.orders import router as orders_router
 from .routes.payments import router as payments_router
 from .routes.export import router as export_router
 from .routes.ui import router as ui_router
+
+
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+)
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request duration seconds",
+    ["method", "path"],
+)
 
 
 def _configure_logging() -> None:
@@ -47,6 +62,7 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
 
     app = FastAPI(title="DesklyCRM", lifespan=lifespan)
     logger = logging.getLogger("desklycrm")
+    app.state.start_time = time.time()
 
     @app.middleware("http")
     async def log_requests(request, call_next):
@@ -56,6 +72,10 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
             response = await call_next(request)
         except Exception:
             duration_ms = (time.perf_counter() - start) * 1000
+            route = request.scope.get("route")
+            path = getattr(route, "path", request.url.path)
+            REQUEST_COUNT.labels(request.method, path, "500").inc()
+            REQUEST_LATENCY.labels(request.method, path).observe(duration_ms / 1000)
             logger.exception(
                 "request failed method=%s path=%s id=%s duration_ms=%.2f",
                 request.method,
@@ -65,6 +85,10 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
             )
             raise
         duration_ms = (time.perf_counter() - start) * 1000
+        route = request.scope.get("route")
+        path = getattr(route, "path", request.url.path)
+        REQUEST_COUNT.labels(request.method, path, str(response.status_code)).inc()
+        REQUEST_LATENCY.labels(request.method, path).observe(duration_ms / 1000)
         response.headers["X-Request-ID"] = request_id
         logger.info(
             "request method=%s path=%s status=%s duration_ms=%.2f id=%s",
@@ -116,6 +140,29 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "service": "deskly-crm"}
+        service = "deskly-crm"
+        version = os.getenv("APP_VERSION", "0.0.0")
+        uptime_seconds = max(0, time.time() - app.state.start_time)
+        db_status = "ok"
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+        except Exception:
+            db_status = "error"
+
+        payload = {
+            "status": "ok" if db_status == "ok" else "error",
+            "service": service,
+            "version": version,
+            "db": db_status,
+            "uptime_seconds": round(uptime_seconds, 2),
+        }
+        if db_status != "ok":
+            return JSONResponse(status_code=503, content=payload)
+        return payload
+
+    @app.get("/metrics")
+    def metrics():
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     return app
