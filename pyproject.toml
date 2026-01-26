@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deskly-crm"
+version = "0.1.2"
+description = "DesklyCRM"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "sqlalchemy",
+  "pydantic",
+  "jinja2",
+]
+
+[tool.setuptools]
+packages = ["app"]
