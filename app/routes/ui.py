@@ -89,6 +89,24 @@ def _render_orders(
     client_map = {c.id: c for c in clients}
     total_pages = max(1, (total + page_size - 1) // page_size)
 
+    order_ids = [o.id for o in orders]
+    paid_map = {}
+    totals = {"price": Decimal("0.00"), "paid": Decimal("0.00"), "balance": Decimal("0.00")}
+    if order_ids:
+        rows = db.execute(
+            select(Payment.order_id, func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.order_id.in_(order_ids))
+            .group_by(Payment.order_id)
+        ).all()
+        paid_map = {order_id: _as_decimal(paid) for order_id, paid in rows}
+
+        for o in orders:
+            price = _as_decimal(o.price)
+            paid = paid_map.get(o.id, Decimal("0.00"))
+            totals["price"] += price
+            totals["paid"] += paid
+            totals["balance"] += price - paid
+
     return templates.TemplateResponse(
         request,
         "orders.html",
@@ -97,6 +115,8 @@ def _render_orders(
             "orders": orders,
             "clients": clients,
             "client_map": client_map,
+            "paid_map": paid_map,
+            "totals": totals,
             "filter_client_id": client_id,
             "filter_status": status or "",
             "filter_q": q or "",

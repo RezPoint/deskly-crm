@@ -31,6 +31,9 @@
 
 <div class="card">
   <h3>List</h3>
+  {% if clients|length == 0 %}
+    <p class="muted">No clients yet.</p>
+  {% endif %}
   <table>
     <thead>
       <tr>
