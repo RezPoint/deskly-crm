@@ -56,6 +56,7 @@ def _render_orders(
     db: Session,
     client_id: Optional[int] = None,
     status: Optional[str] = None,
+    q: Optional[str] = None,
     error: str = "",
     status_code: int = 200,
 ):
@@ -66,6 +67,9 @@ def _render_orders(
         stmt = stmt.where(Order.client_id == client_id)
     if status:
         stmt = stmt.where(Order.status == status)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where((Order.title.ilike(like)) | (Order.comment.ilike(like)))
 
     orders = db.execute(stmt).scalars().all()
     client_map = {c.id: c for c in clients}
@@ -80,6 +84,7 @@ def _render_orders(
             "client_map": client_map,
             "filter_client_id": client_id,
             "filter_status": status or "",
+            "filter_q": q or "",
             "error": error,
         },
         status_code=status_code,
@@ -198,9 +203,10 @@ def ui_orders(
     request: Request,
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    return _render_orders(request, db, client_id=client_id, status=status)
+    return _render_orders(request, db, client_id=client_id, status=status, q=q)
 
 
 @router.post("/orders")

@@ -7,6 +7,7 @@
 <div class="card">
   <h3>Filters</h3>
   <form method="get" action="/ui/orders" class="row">
+    <input name="q" placeholder="Search title/comment" value="{{ filter_q }}" />
     <select name="client_id">
       <option value="">All clients</option>
       {% for c in clients %}

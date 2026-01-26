@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from ..db import get_db
 from ..models import Client, Order, Payment
@@ -23,17 +23,25 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 def list_orders(
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[OrderStatus] = None,
+    q: Optional[str] = Query(None, min_length=1, max_length=200),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    q = select(Order).order_by(Order.id.desc())
+    stmt = select(Order).order_by(Order.id.desc())
 
     if client_id is not None:
-        q = q.where(Order.client_id == client_id)
+        stmt = stmt.where(Order.client_id == client_id)
 
     if status is not None:
-        q = q.where(Order.status == status.value)
+        stmt = stmt.where(Order.status == status.value)
 
-    return db.execute(q).scalars().all()
+    if q:
+        s = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Order.title.ilike(s), Order.comment.ilike(s)))
+
+    stmt = stmt.limit(limit).offset(offset)
+    return db.execute(stmt).scalars().all()
 
 
 @router.get("/{order_id}", response_model=OrderOut)

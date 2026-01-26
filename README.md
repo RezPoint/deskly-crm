@@ -44,6 +44,19 @@ Set `DATABASE_URL` to use Postgres:
 set DATABASE_URL=postgresql+psycopg://deskly:deskly@localhost:5432/desklycrm
 ```
 
+## Database Migrations
+Alembic is available for schema migrations.
+```bash
+alembic upgrade head
+```
+
+To create new migrations:
+```bash
+alembic revision --autogenerate -m "describe change"
+```
+
+If you use migrations in production, set `AUTO_CREATE_DB=0` to avoid `create_all`.
+
 ## Development
 ```bash
 python -m pytest -q

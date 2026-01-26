@@ -7,3 +7,10 @@ lint:
 
 test:
 	python -m compileall app	
+
+migrate:
+	alembic upgrade head
+
+revision:
+	@if [ -z "$(MSG)" ]; then echo "MSG is required, e.g. make revision MSG='add table'"; exit 1; fi
+	alembic revision --autogenerate -m "$(MSG)"
