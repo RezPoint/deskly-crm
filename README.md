@@ -30,6 +30,8 @@ uvicorn app.main:app --reload
 ```
 
 Open in your browser: http://127.0.0.1:8000
+Health: http://127.0.0.1:8000/health
+Metrics: http://127.0.0.1:8000/metrics
 
 ## Docker (Recommended)
 ```bash
@@ -37,6 +39,8 @@ docker compose up --build
 ```
 
 Open in your browser: http://127.0.0.1:8000
+Health: http://127.0.0.1:8000/health
+Metrics: http://127.0.0.1:8000/metrics
 
 ## PostgreSQL (Local)
 Set `DATABASE_URL` to use Postgres:
@@ -58,6 +62,15 @@ alembic revision --autogenerate -m "describe change"
 If you use migrations in production, set `AUTO_CREATE_DB=0` to avoid `create_all`.
 PostgreSQL users should run migrations after changing `DATABASE_URL`.
 You can also run migrations on startup by setting `MIGRATE_ON_START=1`.
+
+## Observability
+Environment variables:
+- `LOG_LEVEL` (default: `INFO`)
+- `APP_VERSION` (default: `0.0.0`)
+
+Endpoints:
+- `GET /health` returns `status`, `service`, `version`, `db`, `uptime_seconds`
+- `GET /metrics` exposes Prometheus metrics
 
 ## Development
 ```bash
