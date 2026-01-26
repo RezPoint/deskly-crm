@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, or_
 
 from ..db import get_db
@@ -80,6 +81,13 @@ def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
         notes=notes,
     )
     db.add(c)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="client with same phone/telegram already exists",
+        )
     db.refresh(c)
     return c
