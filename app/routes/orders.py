@@ -1,7 +1,7 @@
 from typing import List, Optional
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
@@ -37,7 +37,7 @@ def list_orders(
 
 
 @router.get("/{order_id}", response_model=OrderOut)
-def get_order(order_id: int, db: Session = Depends(get_db)):
+def get_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     o = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
     if o is None:
         raise HTTPException(status_code=404, detail="order not found")
@@ -45,7 +45,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{order_id}/summary", response_model=OrderSummaryOut)
-def order_summary(order_id: int, db: Session = Depends(get_db)):
+def order_summary(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
@@ -54,15 +54,12 @@ def order_summary(order_id: int, db: Session = Depends(get_db)):
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
-    # ВАЖНО: приводим к float, чтобы JSON отдавал числа, а не строки типа "15000.00"
-    price = float(order.price)
-    paid_total_f = float(paid_total)
-    balance = price - paid_total_f
+    balance = order.price - paid_total
 
     return {
         "order_id": order.id,
-        "price": price,
-        "paid_total": paid_total_f,
+        "price": order.price,
+        "paid_total": paid_total,
         "balance": balance,
     }
 
