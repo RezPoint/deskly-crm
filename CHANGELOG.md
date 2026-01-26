@@ -26,3 +26,13 @@
 
 ### Fixed
 - Unified UI error styling and empty states.
+
+## [0.1.6] - 2026-01-26
+### Added
+- Indexes for filters and search (clients name, orders status/created_at/title/comment).
+- Optional Alembic migrations on startup via `MIGRATE_ON_START=1`.
+- Export search filter for orders (`q`).
+
+### Fixed
+- Date range validation for orders and export endpoints.
+- Docker image now includes Alembic files for migrations.
