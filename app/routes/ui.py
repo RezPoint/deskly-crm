@@ -42,6 +42,40 @@ def _to_decimal(s: str, field_name: str) -> Decimal:
     return d
 
 
+def _render_orders(
+    request: Request,
+    db: Session,
+    client_id: Optional[int] = None,
+    status: Optional[str] = None,
+    error: str = "",
+    status_code: int = 200,
+):
+    clients = db.execute(select(Client).order_by(Client.name.asc())).scalars().all()
+
+    stmt = select(Order).order_by(Order.id.desc())
+    if client_id:
+        stmt = stmt.where(Order.client_id == client_id)
+    if status:
+        stmt = stmt.where(Order.status == status)
+
+    orders = db.execute(stmt).scalars().all()
+    client_map = {c.id: c for c in clients}
+
+    return templates.TemplateResponse(
+        "orders.html",
+        {
+            "request": request,
+            "orders": orders,
+            "clients": clients,
+            "client_map": client_map,
+            "filter_client_id": client_id,
+            "filter_status": status or "",
+            "error": error,
+        },
+        status_code=status_code,
+    )
+
+
 @router.get("/clients")
 def ui_clients(
     request: Request,
@@ -125,29 +159,7 @@ def ui_orders(
     status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    clients = db.execute(select(Client).order_by(Client.name.asc())).scalars().all()
-
-    stmt = select(Order).order_by(Order.id.desc())
-    if client_id:
-        stmt = stmt.where(Order.client_id == client_id)
-    if status:
-        stmt = stmt.where(Order.status == status)
-
-    orders = db.execute(stmt).scalars().all()
-    client_map = {c.id: c for c in clients}
-
-    return templates.TemplateResponse(
-        "orders.html",
-        {
-            "request": request,
-            "orders": orders,
-            "clients": clients,
-            "client_map": client_map,
-            "filter_client_id": client_id,
-            "filter_status": status or "",
-            "error": "",
-        },
-    )
+    return _render_orders(request, db, client_id=client_id, status=status)
 
 
 @router.post("/orders")
@@ -162,19 +174,39 @@ def ui_create_order(
 ):
     client = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
     if client is None:
-        raise HTTPException(status_code=404, detail="client not found")
+        return _render_orders(
+            request,
+            db,
+            error="Client not found",
+            status_code=404,
+        )
 
     title_clean = (title or "").strip()
     if not title_clean:
-        raise HTTPException(status_code=422, detail="title must not be empty")
+        return _render_orders(
+            request,
+            db,
+            error="Title must not be empty",
+            status_code=422,
+        )
 
     price_dec = _to_decimal(price, "price")
     if price_dec < Decimal("0.00"):
-        raise HTTPException(status_code=422, detail="price must be >= 0")
+        return _render_orders(
+            request,
+            db,
+            error="Price must be >= 0",
+            status_code=422,
+        )
 
     allowed_statuses = {"new", "in_progress", "done", "canceled"}
     if status not in allowed_statuses:
-        raise HTTPException(status_code=422, detail="invalid status")
+        return _render_orders(
+            request,
+            db,
+            error="Invalid status",
+            status_code=422,
+        )
 
     comment_clean = comment.strip() if comment else None
 
