@@ -4,6 +4,10 @@
 {% block content %}
 <h1>Clients</h1>
 
+{% if error %}
+  <p class="err">{{ error }}</p>
+{% endif %}
+
 <div class="card">
   <form method="get" action="/ui/clients" class="row">
     <input name="q" placeholder="Search name/phone/telegram" value="{{ q }}" />
@@ -35,7 +39,7 @@
 <div class="card">
   <h3>List</h3>
   {% if clients|length == 0 %}
-    <p class="muted">No clients yet.</p>
+    <p class="muted">No clients yet. Add your first client above.</p>
   {% endif %}
   <table>
     <thead>

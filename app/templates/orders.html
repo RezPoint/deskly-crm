@@ -4,6 +4,10 @@
 {% block content %}
 <h1>Orders</h1>
 
+{% if error %}
+  <p class="err">{{ error }}</p>
+{% endif %}
+
 <div class="card">
   <h3>Filters</h3>
   <form method="get" action="/ui/orders" class="row">
@@ -63,7 +67,7 @@
 <div class="card">
   <h3>List</h3>
   {% if orders|length == 0 %}
-    <p class="muted">No orders yet.</p>
+    <p class="muted">No orders yet. Create one above to start tracking.</p>
   {% else %}
     <div class="row">
       <span class="muted">Total price: {{ totals.price|money }}</span>
