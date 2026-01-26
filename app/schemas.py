@@ -13,7 +13,7 @@ Money = condecimal(max_digits=12, decimal_places=2)
 class APIModel(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
-        json_encoders={Decimal: float},  # Decimal -> number in JSON
+        json_encoders={Decimal: str},  # Decimal -> string in JSON
     )
 
 

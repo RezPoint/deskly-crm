@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .db import Base
@@ -12,6 +12,10 @@ def utcnow():
 
 class Client(Base):
     __tablename__ = "clients"
+    __table_args__ = (
+        UniqueConstraint("phone", name="uq_clients_phone"),
+        UniqueConstraint("telegram", name="uq_clients_telegram"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(120), nullable=False)

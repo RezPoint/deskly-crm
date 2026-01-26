@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
@@ -33,7 +33,16 @@ def create_payment(payload: PaymentCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/by-order/{order_id}", response_model=list[PaymentOut])
-def list_payments_by_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+def list_payments_by_order(
+    order_id: int = Path(..., ge=1),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
     return db.execute(
-        select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+        select(Payment)
+        .where(Payment.order_id == order_id)
+        .order_by(Payment.id.desc())
+        .limit(limit)
+        .offset(offset)
     ).scalars().all()
