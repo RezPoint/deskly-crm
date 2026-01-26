@@ -47,6 +47,15 @@ def get_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     return o
 
 
+@router.delete("/{order_id}", status_code=204)
+def delete_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+    db.delete(order)
+    db.commit()
+
+
 @router.get("/{order_id}/summary", response_model=OrderSummaryOut)
 def order_summary(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()

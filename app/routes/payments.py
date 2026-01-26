@@ -48,3 +48,12 @@ def list_payments_by_order(
         .limit(limit)
         .offset(offset)
     ).scalars().all()
+
+
+@router.delete("/{payment_id}", status_code=204)
+def delete_payment(payment_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+    payment = db.execute(select(Payment).where(Payment.id == payment_id)).scalar_one_or_none()
+    if payment is None:
+        raise HTTPException(status_code=404, detail="payment not found")
+    db.delete(payment)
+    db.commit()
