@@ -11,3 +11,7 @@
 - Money calculations now normalize Decimal/float values to avoid SQLite float issues.
 - UI TemplateResponse signature updated to avoid Starlette deprecation warnings.
 - Client creation now handles unique constraint races with a 409 response.
+
+## [0.1.4] - 2026-01-26
+### Fixed
+- CI smoke test aligned with numeric JSON responses for money fields.
