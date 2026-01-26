@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
@@ -51,6 +52,18 @@ def _as_decimal(value: object) -> Decimal:
     return Decimal(str(value))
 
 
+def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"{field} must be ISO date or datetime")
+    if value and len(value) == 10:
+        dt = datetime.combine(dt.date(), time.max if is_end else time.min)
+    return dt
+
+
 def _render_orders(
     request: Request,
     db: Session,
@@ -58,6 +71,8 @@ def _render_orders(
     status: Optional[str] = None,
     q: Optional[str] = None,
     sort: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
     error: str = "",
@@ -80,6 +95,13 @@ def _render_orders(
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where((Order.title.ilike(like)) | (Order.comment.ilike(like)))
+
+    start_dt = _parse_date(date_from, "date_from", is_end=False)
+    end_dt = _parse_date(date_to, "date_to", is_end=True)
+    if start_dt:
+        stmt = stmt.where(Order.created_at >= start_dt)
+    if end_dt:
+        stmt = stmt.where(Order.created_at <= end_dt)
 
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     page_size = max(1, min(page_size, 200))
@@ -121,6 +143,8 @@ def _render_orders(
             "filter_status": status or "",
             "filter_q": q or "",
             "filter_sort": sort or "created_desc",
+            "filter_date_from": date_from or "",
+            "filter_date_to": date_to or "",
             "page": page,
             "page_size": page_size,
             "total_pages": total_pages,
@@ -280,6 +304,8 @@ def ui_orders(
     status: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     sort: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -291,6 +317,8 @@ def ui_orders(
         status=status,
         q=q,
         sort=sort,
+        date_from=date_from,
+        date_to=date_to,
         page=page,
         page_size=page_size,
     )

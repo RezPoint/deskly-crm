@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
+from datetime import datetime, time
+
 from sqlalchemy import select, func, or_
 
 from ..db import get_db
@@ -19,6 +21,18 @@ from ..schemas import (
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 
+def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"{field} must be ISO date or datetime")
+    if value and len(value) == 10:
+        dt = datetime.combine(dt.date(), time.max if is_end else time.min)
+    return dt
+
+
 @router.get("", response_model=List[OrderOut])
 def list_orders(
     client_id: Optional[int] = Query(None, ge=1),
@@ -27,8 +41,13 @@ def list_orders(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     sort: str = Query("created_desc", pattern="^(created_desc|created_asc|price_desc|price_asc)$"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
+    start_dt = _parse_date(date_from, "date_from", is_end=False)
+    end_dt = _parse_date(date_to, "date_to", is_end=True)
+
     if sort == "created_asc":
         stmt = select(Order).order_by(Order.id.asc())
     elif sort == "price_desc":
@@ -47,6 +66,11 @@ def list_orders(
     if q:
         s = f"%{q.strip()}%"
         stmt = stmt.where(or_(Order.title.ilike(s), Order.comment.ilike(s)))
+
+    if start_dt:
+        stmt = stmt.where(Order.created_at >= start_dt)
+    if end_dt:
+        stmt = stmt.where(Order.created_at <= end_dt)
 
     stmt = stmt.limit(limit).offset(offset)
     return db.execute(stmt).scalars().all()

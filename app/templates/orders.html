@@ -8,6 +8,8 @@
   <h3>Filters</h3>
   <form method="get" action="/ui/orders" class="row">
     <input name="q" placeholder="Search title/comment" value="{{ filter_q }}" />
+    <input name="date_from" placeholder="Date from (YYYY-MM-DD)" value="{{ filter_date_from }}" />
+    <input name="date_to" placeholder="Date to (YYYY-MM-DD)" value="{{ filter_date_to }}" />
     <select name="sort">
       <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
       <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
@@ -32,6 +34,9 @@
     <button type="submit">Apply</button>
     <a class="muted" href="/ui/orders">Reset</a>
   </form>
+  <div class="row">
+    <a href="/api/export/orders.csv?client_id={{ filter_client_id }}&status={{ filter_status }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Export CSV</a>
+  </div>
 </div>
 
 <div class="card">
