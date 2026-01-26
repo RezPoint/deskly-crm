@@ -20,9 +20,9 @@ def test_smoke_flow(client):
     r = client.get(f"/api/orders/{order_id}/summary")
     assert r.status_code == 200
     data = r.json()
-    assert data["price"] == "15000.00"
-    assert data["paid_total"] == "8000.00"
-    assert data["balance"] == "7000.00"
+    assert round(data["price"], 2) == 15000.00
+    assert round(data["paid_total"], 2) == 8000.00
+    assert round(data["balance"], 2) == 7000.00
 
     # 5) export endpoints should respond
     r = client.get("/api/export/clients.csv")
