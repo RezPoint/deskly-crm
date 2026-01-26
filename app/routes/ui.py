@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
@@ -42,14 +43,24 @@ def _to_decimal(s: str, field_name: str) -> Decimal:
     return d
 
 
-def _render_orders_with_error(
+def _as_decimal(value: object) -> Decimal:
+    if value is None:
+        return Decimal("0.00")
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def _render_orders(
     request: Request,
     db: Session,
-    error: str,
     client_id: Optional[int] = None,
     status: Optional[str] = None,
+    error: str = "",
+    status_code: int = 200,
 ):
     clients = db.execute(select(Client).order_by(Client.name.asc())).scalars().all()
+
     stmt = select(Order).order_by(Order.id.desc())
     if client_id:
         stmt = stmt.where(Order.client_id == client_id)
@@ -60,6 +71,7 @@ def _render_orders_with_error(
     client_map = {c.id: c for c in clients}
 
     return templates.TemplateResponse(
+        request,
         "orders.html",
         {
             "request": request,
@@ -68,37 +80,6 @@ def _render_orders_with_error(
             "client_map": client_map,
             "filter_client_id": client_id,
             "filter_status": status or "",
-            "error": error,
-        },
-        status_code=422,
-    )
-
-
-def _render_order_detail_error(
-    request: Request,
-    db: Session,
-    order: Order,
-    error: str,
-    status_code: int = 422,
-):
-    client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
-    payments = db.execute(
-        select(Payment).where(Payment.order_id == order.id).order_by(Payment.id.desc())
-    ).scalars().all()
-    paid_total: Decimal = db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order.id)
-    ).scalar_one()
-    balance: Decimal = order.price - paid_total
-
-    return templates.TemplateResponse(
-        "order_detail.html",
-        {
-            "request": request,
-            "order": order,
-            "client": client,
-            "payments": payments,
-            "paid_total": paid_total,
-            "balance": balance,
             "error": error,
         },
         status_code=status_code,
@@ -122,6 +103,7 @@ def ui_clients(
     clients = db.execute(stmt).scalars().all()
 
     return templates.TemplateResponse(
+        request,
         "clients.html",
         {"request": request, "clients": clients, "q": q or "", "error": ""},
     )
@@ -139,6 +121,7 @@ def ui_create_client(
     name_clean = (name or "").strip()
     if not name_clean:
         return templates.TemplateResponse(
+            request,
             "clients.html",
             {
                 "request": request,
@@ -164,6 +147,7 @@ def ui_create_client(
         exists = db.execute(select(Client.id).where(or_(*conditions))).scalar_one_or_none()
         if exists is not None:
             return templates.TemplateResponse(
+                request,
                 "clients.html",
                 {
                     "request": request,
@@ -176,7 +160,21 @@ def ui_create_client(
 
     c = Client(name=name_clean, phone=phone_clean, telegram=telegram_clean, notes=notes_clean)
     db.add(c)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return templates.TemplateResponse(
+            request,
+            "clients.html",
+            {
+                "request": request,
+                "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
+                "q": "",
+                "error": "Client with same phone/telegram already exists",
+            },
+            status_code=409,
+        )
 
     return RedirectResponse(url="/ui/clients", status_code=303)
 
@@ -188,29 +186,7 @@ def ui_orders(
     status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    clients = db.execute(select(Client).order_by(Client.name.asc())).scalars().all()
-
-    stmt = select(Order).order_by(Order.id.desc())
-    if client_id:
-        stmt = stmt.where(Order.client_id == client_id)
-    if status:
-        stmt = stmt.where(Order.status == status)
-
-    orders = db.execute(stmt).scalars().all()
-    client_map = {c.id: c for c in clients}
-
-    return templates.TemplateResponse(
-        "orders.html",
-        {
-            "request": request,
-            "orders": orders,
-            "clients": clients,
-            "client_map": client_map,
-            "filter_client_id": client_id,
-            "filter_status": status or "",
-            "error": "",
-        },
-    )
+    return _render_orders(request, db, client_id=client_id, status=status)
 
 
 @router.post("/orders")
@@ -225,22 +201,39 @@ def ui_create_order(
 ):
     client = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
     if client is None:
-        return _render_orders_with_error(request, db, "Client not found.")
+        return _render_orders(
+            request,
+            db,
+            error="Client not found",
+            status_code=404,
+        )
 
     title_clean = (title or "").strip()
     if not title_clean:
-        return _render_orders_with_error(request, db, "Title must not be empty.")
+        return _render_orders(
+            request,
+            db,
+            error="Title must not be empty",
+            status_code=422,
+        )
 
-    try:
-        price_dec = _to_decimal(price, "price")
-    except HTTPException:
-        return _render_orders_with_error(request, db, "Price must be a number.")
+    price_dec = _to_decimal(price, "price")
     if price_dec < Decimal("0.00"):
-        return _render_orders_with_error(request, db, "Price must be >= 0.")
+        return _render_orders(
+            request,
+            db,
+            error="Price must be >= 0",
+            status_code=422,
+        )
 
     allowed_statuses = {"new", "in_progress", "done", "canceled"}
     if status not in allowed_statuses:
-        return _render_orders_with_error(request, db, "Invalid status.")
+        return _render_orders(
+            request,
+            db,
+            error="Invalid status",
+            status_code=422,
+        )
 
     comment_clean = comment.strip() if comment else None
 
@@ -274,13 +267,16 @@ def ui_order_detail(
         select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
     ).scalars().all()
 
-    paid_total: Decimal = db.execute(
+    paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
-    balance: Decimal = order.price - paid_total
+    paid_total = _as_decimal(paid_total_raw)
+    price = _as_decimal(order.price)
+    balance: Decimal = price - paid_total
 
     return templates.TemplateResponse(
+        request,
         "order_detail.html",
         {
             "request": request,
@@ -305,26 +301,26 @@ def ui_add_payment(
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
-    try:
-        amount_dec = _to_decimal(amount, "amount")
-    except HTTPException:
-        return _render_order_detail_error(request, db, order, "Amount must be a number.")
+    amount_dec = _to_decimal(amount, "amount")
     if amount_dec <= Decimal("0.00"):
-        return _render_order_detail_error(request, db, order, "Amount must be > 0.")
+        raise HTTPException(status_code=422, detail="amount must be > 0")
 
-    paid_total: Decimal = db.execute(
+    paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
+    paid_total = _as_decimal(paid_total_raw)
+    price = _as_decimal(order.price)
 
     # защита от переплаты
-    if paid_total + amount_dec > order.price:
+    if paid_total + amount_dec > price:
         payments = db.execute(
             select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
         ).scalars().all()
         client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
-        balance = order.price - paid_total
+        balance = price - paid_total
 
         return templates.TemplateResponse(
+            request,
             "order_detail.html",
             {
                 "request": request,
@@ -347,7 +343,6 @@ def ui_add_payment(
 
 @router.post("/orders/{order_id}/status")
 def ui_update_order_status(
-    request: Request,
     order_id: int,
     status: str = Form(...),
     db: Session = Depends(get_db),
@@ -358,7 +353,7 @@ def ui_update_order_status(
 
     allowed = {"new", "in_progress", "done", "canceled"}
     if status not in allowed:
-        return _render_order_detail_error(request, db, order, "Invalid status.")
+        raise HTTPException(status_code=422, detail="invalid status")
 
     order.status = status
     db.commit()
@@ -377,25 +372,25 @@ def ui_update_order_price(
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
-    try:
-        new_price = _to_decimal(price, "price")
-    except HTTPException:
-        return _render_order_detail_error(request, db, order, "Price must be a number.")
+    new_price = _to_decimal(price, "price")
     if new_price < Decimal("0.00"):
-        return _render_order_detail_error(request, db, order, "Price must be >= 0.")
+        raise HTTPException(status_code=422, detail="price must be >= 0")
 
-    paid_total: Decimal = db.execute(
+    paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
+    paid_total = _as_decimal(paid_total_raw)
+    price = _as_decimal(order.price)
 
     if new_price < paid_total:
         payments = db.execute(
             select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
         ).scalars().all()
         client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
-        balance = order.price - paid_total
+        balance = price - paid_total
 
         return templates.TemplateResponse(
+            request,
             "order_detail.html",
             {
                 "request": request,

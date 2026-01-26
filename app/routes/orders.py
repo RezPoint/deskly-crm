@@ -53,15 +53,17 @@ def order_summary(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
-    paid_total: Decimal = db.execute(
+    paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
-    balance = order.price - paid_total
+    paid_total = Decimal(str(paid_total_raw))
+    price = Decimal(str(order.price))
+    balance = price - paid_total
 
     return {
         "order_id": order.id,
-        "price": order.price,
+        "price": price,
         "paid_total": paid_total,
         "balance": balance,
     }
@@ -88,10 +90,11 @@ def update_order_price(order_id: int, payload: OrderPriceUpdate, db: Session = D
         raise HTTPException(status_code=404, detail="order not found")
 
     # нельзя уменьшить цену ниже уже оплаченной суммы
-    paid_total: Decimal = db.execute(
+    paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
+    paid_total = Decimal(str(paid_total_raw))
     if payload.price < paid_total:
         raise HTTPException(status_code=409, detail="new price is below already paid total")
 

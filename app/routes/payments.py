@@ -17,12 +17,14 @@ def create_payment(payload: PaymentCreate, db: Session = Depends(get_db)):
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
-    paid_total: Decimal = db.execute(
+    paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == payload.order_id)
     ).scalar_one()
 
+    paid_total = Decimal(str(paid_total_raw))
     # защита от переплаты (с учетом Decimal)
-    if paid_total + payload.amount > order.price:
+    price = Decimal(str(order.price))
+    if paid_total + payload.amount > price:
         raise HTTPException(status_code=409, detail="payment exceeds order remaining balance")
 
     p = Payment(order_id=payload.order_id, amount=payload.amount)
