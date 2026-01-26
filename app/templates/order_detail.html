@@ -68,7 +68,7 @@
         <td>{{ p.amount|money }}</td>
         <td class="muted">{{ p.created_at }}</td>
         <td class="actions">
-          <form method="post" action="/ui/payments/{{ p.id }}/delete" class="inline">
+          <form method="post" action="/ui/payments/{{ p.id }}/delete" class="inline" data-confirm="Delete payment?">
             <button type="submit" class="danger">Delete</button>
           </form>
         </td>

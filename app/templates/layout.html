@@ -12,6 +12,8 @@
     .row { display: flex; gap: 10px; flex-wrap: wrap; }
     input, select, textarea, button { padding: 10px; border-radius: 10px; border: 1px solid #ddd; }
     button { cursor: pointer; }
+    .inline { display: inline; }
+    .danger { color: #b00020; border-color: #f2b5bd; background: #fff5f6; }
     .err { color: #b00020; margin: 10px 0; }
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: 10px; border-bottom: 1px solid #eee; }
@@ -30,5 +32,16 @@
   {% endif %}
 
   {% block content %}{% endblock %}
+
+  <script>
+    document.addEventListener("submit", (event) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      const message = form.getAttribute("data-confirm");
+      if (message && !window.confirm(message)) {
+        event.preventDefault();
+      }
+    });
+  </script>
 </body>
 </html>
