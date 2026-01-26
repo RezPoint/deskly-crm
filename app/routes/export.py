@@ -31,6 +31,7 @@ def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optio
 def export_orders_csv(
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -54,6 +55,9 @@ def export_orders_csv(
         stmt = stmt.where(Order.client_id == client_id)
     if status:
         stmt = stmt.where(Order.status == status)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where((Order.title.ilike(like)) | (Order.comment.ilike(like)))
     if start_dt:
         stmt = stmt.where(Order.created_at >= start_dt)
     if end_dt:
