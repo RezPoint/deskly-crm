@@ -56,6 +56,7 @@ alembic revision --autogenerate -m "describe change"
 ```
 
 If you use migrations in production, set `AUTO_CREATE_DB=0` to avoid `create_all`.
+PostgreSQL users should run migrations after changing `DATABASE_URL`.
 
 ## Development
 ```bash
