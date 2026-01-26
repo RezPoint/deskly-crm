@@ -48,18 +48,18 @@
   <form method="post" action="/ui/orders" class="row">
     <select name="client_id" required>
       {% for c in clients %}
-        <option value="{{ c.id }}">{{ c.name }} ({{ c.id }})</option>
+        <option value="{{ c.id }}" {% if create_client_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.id }})</option>
       {% endfor %}
     </select>
-    <input name="title" placeholder="Title *" required />
-    <input name="price" placeholder="Price (e.g. 15000 or 15000.00)" value="0" />
+    <input name="title" placeholder="Title *" value="{{ create_title }}" required />
+    <input name="price" placeholder="Price (e.g. 15000 or 15000.00)" value="{{ create_price }}" />
     <select name="status">
-      <option value="new">new</option>
-      <option value="in_progress">in_progress</option>
-      <option value="done">done</option>
-      <option value="canceled">canceled</option>
+      <option value="new" {% if create_status == "new" %}selected{% endif %}>new</option>
+      <option value="in_progress" {% if create_status == "in_progress" %}selected{% endif %}>in_progress</option>
+      <option value="done" {% if create_status == "done" %}selected{% endif %}>done</option>
+      <option value="canceled" {% if create_status == "canceled" %}selected{% endif %}>canceled</option>
     </select>
-    <input name="comment" placeholder="Comment" />
+    <input name="comment" placeholder="Comment" value="{{ create_comment }}" />
     <button type="submit">Create</button>
   </form>
 </div>

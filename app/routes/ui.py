@@ -90,6 +90,11 @@ def _render_orders(
     date_to: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
+    create_client_id: Optional[int] = None,
+    create_title: str = "",
+    create_price: str = "0",
+    create_status: str = "new",
+    create_comment: str = "",
     error: str = "",
     status_code: int = 200,
 ):
@@ -179,6 +184,11 @@ def _render_orders(
             "filter_sort": sort or "created_desc",
             "filter_date_from": date_from or "",
             "filter_date_to": date_to or "",
+            "create_client_id": create_client_id,
+            "create_title": create_title,
+            "create_price": create_price,
+            "create_status": create_status,
+            "create_comment": create_comment,
             "page": page,
             "page_size": page_size,
             "total_pages": total_pages,
@@ -230,6 +240,10 @@ def ui_clients(
             "page": page,
             "page_size": page_size,
             "total_pages": total_pages,
+            "form_name": "",
+            "form_phone": "",
+            "form_telegram": "",
+            "form_notes": "",
             "error": "",
         },
     )
@@ -257,6 +271,10 @@ def ui_create_client(
                 "page": 1,
                 "page_size": 50,
                 "total_pages": 1,
+                "form_name": name,
+                "form_phone": phone or "",
+                "form_telegram": telegram or "",
+                "form_notes": notes or "",
                 "error": "Name must not be empty",
             },
             status_code=422,
@@ -287,6 +305,10 @@ def ui_create_client(
                     "page": 1,
                     "page_size": 50,
                     "total_pages": 1,
+                    "form_name": name,
+                    "form_phone": phone or "",
+                    "form_telegram": telegram or "",
+                    "form_notes": notes or "",
                     "error": "Client with same phone/telegram already exists",
                 },
                 status_code=409,
@@ -309,6 +331,10 @@ def ui_create_client(
                 "page": 1,
                 "page_size": 50,
                 "total_pages": 1,
+                "form_name": name,
+                "form_phone": phone or "",
+                "form_telegram": telegram or "",
+                "form_notes": notes or "",
                 "error": "Client with same phone/telegram already exists",
             },
             status_code=409,
@@ -373,6 +399,11 @@ def ui_create_order(
         return _render_orders(
             request,
             db,
+            create_client_id=client_id,
+            create_title=title,
+            create_price=price,
+            create_status=status,
+            create_comment=comment or "",
             error="Client not found",
             status_code=404,
         )
@@ -382,6 +413,11 @@ def ui_create_order(
         return _render_orders(
             request,
             db,
+            create_client_id=client_id,
+            create_title=title,
+            create_price=price,
+            create_status=status,
+            create_comment=comment or "",
             error="Title must not be empty",
             status_code=422,
         )
@@ -391,6 +427,11 @@ def ui_create_order(
         return _render_orders(
             request,
             db,
+            create_client_id=client_id,
+            create_title=title,
+            create_price=price,
+            create_status=status,
+            create_comment=comment or "",
             error="Price must be >= 0",
             status_code=422,
         )
@@ -400,6 +441,11 @@ def ui_create_order(
         return _render_orders(
             request,
             db,
+            create_client_id=client_id,
+            create_title=title,
+            create_price=price,
+            create_status=status,
+            create_comment=comment or "",
             error="Invalid status",
             status_code=422,
         )
@@ -468,6 +514,8 @@ def ui_order_detail(
             "payments": payments,
             "paid_total": paid_total,
             "balance": balance,
+            "payment_amount": "",
+            "price_input": f"{price:.2f}",
             "error": "",
         },
     )
@@ -486,7 +534,33 @@ def ui_add_payment(
 
     amount_dec = _to_decimal(amount, "amount")
     if amount_dec <= Decimal("0.00"):
-        raise HTTPException(status_code=422, detail="amount must be > 0")
+        payments = db.execute(
+            select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+        ).scalars().all()
+        client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+        paid_total_raw = db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+        ).scalar_one()
+        paid_total = _as_decimal(paid_total_raw)
+        price = _as_decimal(order.price)
+        balance = price - paid_total
+
+        return templates.TemplateResponse(
+            request,
+            "order_detail.html",
+            {
+                "request": request,
+                "order": order,
+                "client": client,
+                "payments": payments,
+                "paid_total": paid_total,
+                "balance": balance,
+                "payment_amount": amount,
+                "price_input": f"{price:.2f}",
+                "error": "Amount must be > 0",
+            },
+            status_code=422,
+        )
 
     paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
@@ -512,6 +586,8 @@ def ui_add_payment(
                 "payments": payments,
                 "paid_total": paid_total,
                 "balance": balance,
+                "payment_amount": amount,
+                "price_input": f"{price:.2f}",
                 "error": "Payment exceeds order price (overpay is not allowed).",
             },
             status_code=409,
@@ -572,7 +648,33 @@ def ui_update_order_price(
 
     new_price = _to_decimal(price, "price")
     if new_price < Decimal("0.00"):
-        raise HTTPException(status_code=422, detail="price must be >= 0")
+        payments = db.execute(
+            select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+        ).scalars().all()
+        client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+        paid_total_raw = db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+        ).scalar_one()
+        paid_total = _as_decimal(paid_total_raw)
+        price = _as_decimal(order.price)
+        balance = price - paid_total
+
+        return templates.TemplateResponse(
+            request,
+            "order_detail.html",
+            {
+                "request": request,
+                "order": order,
+                "client": client,
+                "payments": payments,
+                "paid_total": paid_total,
+                "balance": balance,
+                "payment_amount": "",
+                "price_input": price,
+                "error": "Price must be >= 0",
+            },
+            status_code=422,
+        )
 
     paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
@@ -597,6 +699,8 @@ def ui_update_order_price(
                 "payments": payments,
                 "paid_total": paid_total,
                 "balance": balance,
+                "payment_amount": "",
+                "price_input": price,
                 "error": "New price cannot be below already paid total.",
             },
             status_code=409,

@@ -36,7 +36,7 @@
 
   <h3>Update price</h3>
   <form method="post" action="/ui/orders/{{ order.id }}/price" class="row">
-    <input name="price" value="{{ order.price|money }}" />
+    <input name="price" value="{{ price_input }}" />
     <button type="submit">Save</button>
   </form>
 </div>
@@ -44,7 +44,7 @@
 <div class="card">
   <h3>Add payment</h3>
   <form method="post" action="/ui/orders/{{ order.id }}/payments" class="row">
-    <input name="amount" placeholder="Amount (e.g. 8000 or 8000.00)" required />
+    <input name="amount" placeholder="Amount (e.g. 8000 or 8000.00)" value="{{ payment_amount }}" required />
     <button type="submit">Add</button>
   </form>
 </div>
