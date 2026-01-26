@@ -18,7 +18,7 @@ Keep your client work in one place: who requested what, what’s in progress, wh
 
 ## Tech Stack
 - **Backend:** FastAPI (Python)
-- **Database:** SQLite
+- **Database:** PostgreSQL (recommended) / SQLite (local default)
 - **UI:** Jinja2 templates (simple web interface)
 
 ## Quick Start
@@ -37,6 +37,12 @@ docker compose up --build
 ```
 
 Open in your browser: http://127.0.0.1:8000
+
+## PostgreSQL (Local)
+Set `DATABASE_URL` to use Postgres:
+```bash
+set DATABASE_URL=postgresql+psycopg://deskly:deskly@localhost:5432/desklycrm
+```
 
 ## Development
 ```bash
