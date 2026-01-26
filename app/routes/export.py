@@ -2,7 +2,10 @@ import csv
 from io import StringIO
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Response
+from datetime import datetime, time
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Response, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
@@ -12,8 +15,29 @@ from ..models import Client, Order, Payment
 router = APIRouter(prefix="/api/export", tags=["export"])
 
 
+def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"{field} must be ISO date or datetime")
+    if value and len(value) == 10:
+        dt = datetime.combine(dt.date(), time.max if is_end else time.min)
+    return dt
+
+
 @router.get("/orders.csv")
-def export_orders_csv(db: Session = Depends(get_db)):
+def export_orders_csv(
+    client_id: Optional[int] = Query(None, ge=1),
+    status: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    start_dt = _parse_date(date_from, "date_from", is_end=False)
+    end_dt = _parse_date(date_to, "date_to", is_end=True)
+
     # total paid per order
     paid_map = dict(
         db.execute(
@@ -22,11 +46,19 @@ def export_orders_csv(db: Session = Depends(get_db)):
         ).all()
     )
 
-    rows = db.execute(
-        select(Order, Client)
-        .join(Client, Client.id == Order.client_id)
-        .order_by(Order.id.desc())
-    ).all()
+    stmt = select(Order, Client).join(Client, Client.id == Order.client_id)
+
+    if client_id is not None:
+        stmt = stmt.where(Order.client_id == client_id)
+    if status:
+        stmt = stmt.where(Order.status == status)
+    if start_dt:
+        stmt = stmt.where(Order.created_at >= start_dt)
+    if end_dt:
+        stmt = stmt.where(Order.created_at <= end_dt)
+
+    stmt = stmt.order_by(Order.id.desc())
+    rows = db.execute(stmt).all()
 
     buf = StringIO()
     writer = csv.writer(buf)

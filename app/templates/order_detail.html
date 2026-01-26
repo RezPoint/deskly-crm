@@ -11,6 +11,7 @@
   <div><b>Price:</b> {{ order.price|money }}</div>
   <div><b>Paid total:</b> {{ paid_total|money }}</div>
   <div><b>Balance:</b> {{ balance|money }}</div>
+  <div><b>Created:</b> {{ order.created_at|dt }}</div>
 
   {% if order.comment %}
     <div class="muted"><b>Comment:</b> {{ order.comment }}</div>
@@ -19,9 +20,7 @@
   <hr/>
 
   {% if error %}
-    <p style="color: red; margin: 8px 0;">
-      <b>{{ error }}</b>
-    </p>
+    <p class="err"><b>{{ error }}</b></p>
   {% endif %}
 
   <h3>Update status</h3>
@@ -66,7 +65,7 @@
       <tr>
         <td>{{ p.id }}</td>
         <td>{{ p.amount|money }}</td>
-        <td class="muted">{{ p.created_at }}</td>
+        <td class="muted">{{ p.created_at|dt }}</td>
         <td class="actions">
           <form method="post" action="/ui/payments/{{ p.id }}/delete" class="inline" data-confirm="Delete payment?">
             <button type="submit" class="danger">Delete</button>

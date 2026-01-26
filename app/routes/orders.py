@@ -3,7 +3,9 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from datetime import datetime, time
+
+from sqlalchemy import select, func, or_
 
 from ..db import get_db
 from ..models import Client, Order, Payment
@@ -19,21 +21,59 @@ from ..schemas import (
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 
+def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"{field} must be ISO date or datetime")
+    if value and len(value) == 10:
+        dt = datetime.combine(dt.date(), time.max if is_end else time.min)
+    return dt
+
+
 @router.get("", response_model=List[OrderOut])
 def list_orders(
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[OrderStatus] = None,
+    q: Optional[str] = Query(None, min_length=1, max_length=200),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    sort: str = Query("created_desc", pattern="^(created_desc|created_asc|price_desc|price_asc)$"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    q = select(Order).order_by(Order.id.desc())
+    start_dt = _parse_date(date_from, "date_from", is_end=False)
+    end_dt = _parse_date(date_to, "date_to", is_end=True)
+
+    if sort == "created_asc":
+        stmt = select(Order).order_by(Order.id.asc())
+    elif sort == "price_desc":
+        stmt = select(Order).order_by(Order.price.desc(), Order.id.desc())
+    elif sort == "price_asc":
+        stmt = select(Order).order_by(Order.price.asc(), Order.id.asc())
+    else:
+        stmt = select(Order).order_by(Order.id.desc())
 
     if client_id is not None:
-        q = q.where(Order.client_id == client_id)
+        stmt = stmt.where(Order.client_id == client_id)
 
     if status is not None:
-        q = q.where(Order.status == status.value)
+        stmt = stmt.where(Order.status == status.value)
 
-    return db.execute(q).scalars().all()
+    if q:
+        s = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Order.title.ilike(s), Order.comment.ilike(s)))
+
+    if start_dt:
+        stmt = stmt.where(Order.created_at >= start_dt)
+    if end_dt:
+        stmt = stmt.where(Order.created_at <= end_dt)
+
+    stmt = stmt.limit(limit).offset(offset)
+    return db.execute(stmt).scalars().all()
 
 
 @router.get("/{order_id}", response_model=OrderOut)

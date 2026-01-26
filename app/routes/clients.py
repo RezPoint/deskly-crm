@@ -22,9 +22,17 @@ def list_clients(
     ),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    sort: str = Query("created_desc", pattern="^(created_desc|created_asc|name_asc|name_desc)$"),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Client).order_by(Client.id.desc())
+    if sort == "created_asc":
+        stmt = select(Client).order_by(Client.id.asc())
+    elif sort == "name_asc":
+        stmt = select(Client).order_by(Client.name.asc())
+    elif sort == "name_desc":
+        stmt = select(Client).order_by(Client.name.desc())
+    else:
+        stmt = select(Client).order_by(Client.id.desc())
 
     if q:
         s = f"%{q.strip()}%"

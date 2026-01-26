@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
@@ -35,6 +36,20 @@ def money(v) -> str:
 templates.env.filters["money"] = money
 
 
+def format_dt(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d %H:%M")
+    try:
+        return datetime.fromisoformat(str(v)).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return str(v)
+
+
+templates.env.filters["dt"] = format_dt
+
+
 def _to_decimal(s: str, field_name: str) -> Decimal:
     try:
         d = Decimal(s.replace(",", ".")).quantize(Decimal("0.01"))
@@ -51,24 +66,82 @@ def _as_decimal(value: object) -> Decimal:
     return Decimal(str(value))
 
 
+def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"{field} must be ISO date or datetime")
+    if value and len(value) == 10:
+        dt = datetime.combine(dt.date(), time.max if is_end else time.min)
+    return dt
+
+
 def _render_orders(
     request: Request,
     db: Session,
     client_id: Optional[int] = None,
     status: Optional[str] = None,
+    q: Optional[str] = None,
+    sort: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
     error: str = "",
     status_code: int = 200,
 ):
     clients = db.execute(select(Client).order_by(Client.name.asc())).scalars().all()
 
-    stmt = select(Order).order_by(Order.id.desc())
+    if sort == "created_asc":
+        stmt = select(Order).order_by(Order.id.asc())
+    elif sort == "price_desc":
+        stmt = select(Order).order_by(Order.price.desc(), Order.id.desc())
+    elif sort == "price_asc":
+        stmt = select(Order).order_by(Order.price.asc(), Order.id.asc())
+    else:
+        stmt = select(Order).order_by(Order.id.desc())
     if client_id:
         stmt = stmt.where(Order.client_id == client_id)
     if status:
         stmt = stmt.where(Order.status == status)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where((Order.title.ilike(like)) | (Order.comment.ilike(like)))
 
+    start_dt = _parse_date(date_from, "date_from", is_end=False)
+    end_dt = _parse_date(date_to, "date_to", is_end=True)
+    if start_dt:
+        stmt = stmt.where(Order.created_at >= start_dt)
+    if end_dt:
+        stmt = stmt.where(Order.created_at <= end_dt)
+
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    page_size = max(1, min(page_size, 200))
+    page = max(1, page)
+    stmt = stmt.limit(page_size).offset((page - 1) * page_size)
     orders = db.execute(stmt).scalars().all()
     client_map = {c.id: c for c in clients}
+    total_pages = max(1, (total + page_size - 1) // page_size)
+
+    order_ids = [o.id for o in orders]
+    paid_map = {}
+    totals = {"price": Decimal("0.00"), "paid": Decimal("0.00"), "balance": Decimal("0.00")}
+    if order_ids:
+        rows = db.execute(
+            select(Payment.order_id, func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.order_id.in_(order_ids))
+            .group_by(Payment.order_id)
+        ).all()
+        paid_map = {order_id: _as_decimal(paid) for order_id, paid in rows}
+
+        for o in orders:
+            price = _as_decimal(o.price)
+            paid = paid_map.get(o.id, Decimal("0.00"))
+            totals["price"] += price
+            totals["paid"] += paid
+            totals["balance"] += price - paid
 
     return templates.TemplateResponse(
         request,
@@ -78,8 +151,17 @@ def _render_orders(
             "orders": orders,
             "clients": clients,
             "client_map": client_map,
+            "paid_map": paid_map,
+            "totals": totals,
             "filter_client_id": client_id,
             "filter_status": status or "",
+            "filter_q": q or "",
+            "filter_sort": sort or "created_desc",
+            "filter_date_from": date_from or "",
+            "filter_date_to": date_to or "",
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
             "error": error,
         },
         status_code=status_code,
@@ -90,9 +172,19 @@ def _render_orders(
 def ui_clients(
     request: Request,
     q: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Client).order_by(Client.id.desc())
+    if sort == "created_asc":
+        stmt = select(Client).order_by(Client.id.asc())
+    elif sort == "name_asc":
+        stmt = select(Client).order_by(Client.name.asc())
+    elif sort == "name_desc":
+        stmt = select(Client).order_by(Client.name.desc())
+    else:
+        stmt = select(Client).order_by(Client.id.desc())
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -100,12 +192,26 @@ def ui_clients(
             | (Client.phone.like(like))
             | (Client.telegram.like(like))
         )
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    page_size = max(1, min(page_size, 200))
+    page = max(1, page)
+    stmt = stmt.limit(page_size).offset((page - 1) * page_size)
     clients = db.execute(stmt).scalars().all()
+    total_pages = max(1, (total + page_size - 1) // page_size)
 
     return templates.TemplateResponse(
         request,
         "clients.html",
-        {"request": request, "clients": clients, "q": q or "", "error": ""},
+        {
+            "request": request,
+            "clients": clients,
+            "q": q or "",
+            "filter_sort": sort or "created_desc",
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "error": "",
+        },
     )
 
 
@@ -127,6 +233,10 @@ def ui_create_client(
                 "request": request,
                 "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
                 "q": "",
+                "filter_sort": "created_desc",
+                "page": 1,
+                "page_size": 50,
+                "total_pages": 1,
                 "error": "Name must not be empty",
             },
             status_code=422,
@@ -153,6 +263,10 @@ def ui_create_client(
                     "request": request,
                     "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
                     "q": "",
+                    "filter_sort": "created_desc",
+                    "page": 1,
+                    "page_size": 50,
+                    "total_pages": 1,
                     "error": "Client with same phone/telegram already exists",
                 },
                 status_code=409,
@@ -171,6 +285,10 @@ def ui_create_client(
                 "request": request,
                 "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
                 "q": "",
+                "filter_sort": "created_desc",
+                "page": 1,
+                "page_size": 50,
+                "total_pages": 1,
                 "error": "Client with same phone/telegram already exists",
             },
             status_code=409,
@@ -198,9 +316,26 @@ def ui_orders(
     request: Request,
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    return _render_orders(request, db, client_id=client_id, status=status)
+    return _render_orders(
+        request,
+        db,
+        client_id=client_id,
+        status=status,
+        q=q,
+        sort=sort,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post("/orders")

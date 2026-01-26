@@ -26,7 +26,9 @@ SessionLocal = make_sessionmaker(engine)
 
 
 def init_db(bind_engine=None) -> None:
-    Base.metadata.create_all(bind=bind_engine or engine)
+    auto_create = os.getenv("AUTO_CREATE_DB", "1") == "1"
+    if auto_create:
+        Base.metadata.create_all(bind=bind_engine or engine)
 
 
 def get_db(request: Request) -> Generator[Session, None, None]:

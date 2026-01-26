@@ -9,3 +9,4 @@ jinja2
 python-multipart
 python-multipart>=0.0.9
 psycopg[binary]
+alembic

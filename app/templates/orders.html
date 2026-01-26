@@ -4,9 +4,22 @@
 {% block content %}
 <h1>Orders</h1>
 
+{% if error %}
+  <p class="err">{{ error }}</p>
+{% endif %}
+
 <div class="card">
   <h3>Filters</h3>
   <form method="get" action="/ui/orders" class="row">
+    <input name="q" placeholder="Search title/comment" value="{{ filter_q }}" />
+    <input name="date_from" placeholder="Date from (YYYY-MM-DD)" value="{{ filter_date_from }}" />
+    <input name="date_to" placeholder="Date to (YYYY-MM-DD)" value="{{ filter_date_to }}" />
+    <select name="sort">
+      <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
+      <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
+      <option value="price_desc" {% if filter_sort == "price_desc" %}selected{% endif %}>Price high→low</option>
+      <option value="price_asc" {% if filter_sort == "price_asc" %}selected{% endif %}>Price low→high</option>
+    </select>
     <select name="client_id">
       <option value="">All clients</option>
       {% for c in clients %}
@@ -25,6 +38,9 @@
     <button type="submit">Apply</button>
     <a class="muted" href="/ui/orders">Reset</a>
   </form>
+  <div class="row">
+    <a href="/api/export/orders.csv?client_id={{ filter_client_id }}&status={{ filter_status }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Export CSV</a>
+  </div>
 </div>
 
 <div class="card">
@@ -50,6 +66,15 @@
 
 <div class="card">
   <h3>List</h3>
+  {% if orders|length == 0 %}
+    <p class="muted">No orders yet. Create one above to start tracking.</p>
+  {% else %}
+    <div class="row">
+      <span class="muted">Total price: {{ totals.price|money }}</span>
+      <span class="muted">Paid: {{ totals.paid|money }}</span>
+      <span class="muted">Balance: {{ totals.balance|money }}</span>
+    </div>
+  {% endif %}
   <table>
     <thead>
       <tr>
@@ -58,6 +83,8 @@
         <th>Title</th>
         <th>Status</th>
         <th>Price</th>
+        <th>Paid</th>
+        <th>Balance</th>
         <th></th>
         <th></th>
       </tr>
@@ -70,6 +97,8 @@
         <td>{{ o.title }}</td>
         <td>{{ o.status }}</td>
         <td>{{ o.price|money }}</td>
+        <td>{{ (paid_map.get(o.id, 0))|money }}</td>
+        <td>{{ (o.price - paid_map.get(o.id, 0))|money }}</td>
         <td><a href="/ui/orders/{{ o.id }}">Open</a></td>
         <td class="actions">
           <form method="post" action="/ui/orders/{{ o.id }}/delete" class="inline" data-confirm="Delete order and all payments?">
@@ -80,5 +109,14 @@
     {% endfor %}
     </tbody>
   </table>
+  <div class="row">
+    <span class="muted">Page {{ page }} / {{ total_pages }}</span>
+    {% if page > 1 %}
+      <a href="/ui/orders?q={{ filter_q }}&client_id={{ filter_client_id }}&status={{ filter_status }}&sort={{ filter_sort }}&page={{ page - 1 }}&page_size={{ page_size }}">Prev</a>
+    {% endif %}
+    {% if page < total_pages %}
+      <a href="/ui/orders?q={{ filter_q }}&client_id={{ filter_client_id }}&status={{ filter_status }}&sort={{ filter_sort }}&page={{ page + 1 }}&page_size={{ page_size }}">Next</a>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
