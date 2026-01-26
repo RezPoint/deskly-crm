@@ -36,6 +36,20 @@ def money(v) -> str:
 templates.env.filters["money"] = money
 
 
+def format_dt(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d %H:%M")
+    try:
+        return datetime.fromisoformat(str(v)).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return str(v)
+
+
+templates.env.filters["dt"] = format_dt
+
+
 def _to_decimal(s: str, field_name: str) -> Decimal:
     try:
         d = Decimal(s.replace(",", ".")).quantize(Decimal("0.01"))

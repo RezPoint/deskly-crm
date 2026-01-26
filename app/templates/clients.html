@@ -55,7 +55,7 @@
         <td>{{ c.name }}</td>
         <td>{{ c.phone or "" }}</td>
         <td>{{ c.telegram or "" }}</td>
-        <td class="muted">{{ c.created_at }}</td>
+        <td class="muted">{{ c.created_at|dt }}</td>
         <td class="actions">
           <form method="post" action="/ui/clients/{{ c.id }}/delete" class="inline" data-confirm="Delete client and all related orders/payments?">
             <button type="submit" class="danger">Delete</button>
