@@ -73,6 +73,7 @@
       <span class="muted">Total price: {{ totals.price|money }}</span>
       <span class="muted">Paid: {{ totals.paid|money }}</span>
       <span class="muted">Balance: {{ totals.balance|money }}</span>
+      <a class="muted" href="{{ summary_url }}">API summary</a>
     </div>
   {% endif %}
   <table>

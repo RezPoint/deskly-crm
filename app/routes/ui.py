@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from urllib.parse import urlencode
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
@@ -143,6 +144,19 @@ def _render_orders(
             totals["paid"] += paid
             totals["balance"] += price - paid
 
+    summary_params = {}
+    if client_id:
+        summary_params["client_id"] = client_id
+    if status:
+        summary_params["status"] = status
+    if date_from:
+        summary_params["date_from"] = date_from
+    if date_to:
+        summary_params["date_to"] = date_to
+    summary_url = "/api/orders/summary/total"
+    if summary_params:
+        summary_url = f"{summary_url}?{urlencode(summary_params)}"
+
     return templates.TemplateResponse(
         request,
         "orders.html",
@@ -153,6 +167,12 @@ def _render_orders(
             "client_map": client_map,
             "paid_map": paid_map,
             "totals": totals,
+            "filter_summary": {
+                "price": totals["price"],
+                "paid_total": totals["paid"],
+                "balance": totals["balance"],
+            },
+            "summary_url": summary_url,
             "filter_client_id": client_id,
             "filter_status": status or "",
             "filter_q": q or "",
