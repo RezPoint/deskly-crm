@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import os
 from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
-from .db import init_db, make_engine, make_sessionmaker
+from .db import init_db, make_engine, make_sessionmaker, run_migrations
 from . import models  # noqa: F401
 
 from .routes.clients import router as clients_router
@@ -24,7 +25,10 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         app.state.engine = engine
         app.state.SessionLocal = SessionLocal
-        init_db(engine)
+        if os.getenv("MIGRATE_ON_START", "0") == "1":
+            run_migrations(database_url)
+        else:
+            init_db(engine)
         yield
 
     app = FastAPI(title="DesklyCRM", lifespan=lifespan)
