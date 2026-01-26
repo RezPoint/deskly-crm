@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "deskly-crm"
 version = "0.1.2"
-description = "DesklyCRM -- lightweight client, orders & payments tracker for freelancers and small businesses."
+description = "DesklyCRM — lightweight client, orders & payments tracker for freelancers and small businesses."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
   { name = "RezPoint" }
