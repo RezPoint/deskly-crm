@@ -15,3 +15,14 @@
 ## [0.1.4] - 2026-01-26
 ### Fixed
 - CI smoke test aligned with numeric JSON responses for money fields.
+
+## [0.1.5] - 2026-01-26
+### Added
+- PostgreSQL support via psycopg, Docker Compose Postgres service.
+- Alembic migrations with initial schema.
+- Pagination, sorting, and date filters for orders.
+- CSV export filters and UI export links.
+- UI totals for orders and formatted dates.
+
+### Fixed
+- Unified UI error styling and empty states.
