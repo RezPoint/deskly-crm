@@ -34,6 +34,11 @@ docker compose up --build
 
 Open in your browser: http://127.0.0.1:8000
 
+## Development
+```bash
+python -m pytest -q
+```
+
 ## Project Structure
 ```txt
 deskly-crm/
