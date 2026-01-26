@@ -72,7 +72,7 @@
         <td>{{ o.price|money }}</td>
         <td><a href="/ui/orders/{{ o.id }}">Open</a></td>
         <td class="actions">
-          <form method="post" action="/ui/orders/{{ o.id }}/delete" class="inline">
+          <form method="post" action="/ui/orders/{{ o.id }}/delete" class="inline" data-confirm="Delete order and all payments?">
             <button type="submit" class="danger">Delete</button>
           </form>
         </td>
