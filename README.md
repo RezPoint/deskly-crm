@@ -27,6 +27,13 @@ uvicorn app.main:app --reload
 
 Open in your browser: http://127.0.0.1:8000
 
+## Docker (Recommended)
+```bash
+docker compose up --build
+```
+
+Open in your browser: http://127.0.0.1:8000
+
 ## Project Structure
 ```txt
 deskly-crm/
@@ -52,7 +59,7 @@ deskly-crm/
 	•v0.1 — clients + orders + statuses + CSV export
 	•v0.2 — authentication + user accounts
 	•v0.3 — reminders, filters, activity log
-	•v1.0 — Docker + deploy guide + stable UI
+	•v1.0 — deploy guide + stable UI
 
 Contributing
 

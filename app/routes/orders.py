@@ -23,8 +23,6 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 def list_orders(
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[OrderStatus] = None,
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     q = select(Order).order_by(Order.id.desc())
@@ -35,7 +33,6 @@ def list_orders(
     if status is not None:
         q = q.where(Order.status == status.value)
 
-    q = q.limit(limit).offset(offset)
     return db.execute(q).scalars().all()
 
 
@@ -47,21 +44,32 @@ def get_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     return o
 
 
+@router.delete("/{order_id}", status_code=204)
+def delete_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+    db.delete(order)
+    db.commit()
+
+
 @router.get("/{order_id}/summary", response_model=OrderSummaryOut)
 def order_summary(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
-    paid_total: Decimal = db.execute(
+    paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
-    balance = order.price - paid_total
+    paid_total = Decimal(str(paid_total_raw))
+    price = Decimal(str(order.price))
+    balance = price - paid_total
 
     return {
         "order_id": order.id,
-        "price": order.price,
+        "price": price,
         "paid_total": paid_total,
         "balance": balance,
     }
@@ -88,10 +96,11 @@ def update_order_price(order_id: int, payload: OrderPriceUpdate, db: Session = D
         raise HTTPException(status_code=404, detail="order not found")
 
     # нельзя уменьшить цену ниже уже оплаченной суммы
-    paid_total: Decimal = db.execute(
+    paid_total_raw = db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
     ).scalar_one()
 
+    paid_total = Decimal(str(paid_total_raw))
     if payload.price < paid_total:
         raise HTTPException(status_code=409, detail="new price is below already paid total")
 

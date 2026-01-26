@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, or_
 
 from ..db import get_db
@@ -47,6 +48,15 @@ def get_client(client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     return c
 
 
+@router.delete("/{client_id}", status_code=204)
+def delete_client(client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+    c = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
+    if c is None:
+        raise HTTPException(status_code=404, detail="client not found")
+    db.delete(c)
+    db.commit()
+
+
 @router.post("", response_model=ClientOut)
 def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
     name = payload.name.strip()
@@ -80,6 +90,13 @@ def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
         notes=notes,
     )
     db.add(c)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="client with same phone/telegram already exists",
+        )
     db.refresh(c)
     return c

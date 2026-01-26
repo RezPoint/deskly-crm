@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, condecimal
+from pydantic import BaseModel, ConfigDict, Field, condecimal, field_serializer
 
 Money = condecimal(max_digits=12, decimal_places=2)
 
@@ -13,8 +13,13 @@ Money = condecimal(max_digits=12, decimal_places=2)
 class APIModel(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
-        json_encoders={Decimal: str},  # Decimal -> string in JSON
     )
+
+    @field_serializer("*", when_used="json", check_fields=False)
+    def _serialize_decimal(self, value):
+        if isinstance(value, Decimal):
+            return float(value)
+        return value
 
 
 class ClientCreate(APIModel):
