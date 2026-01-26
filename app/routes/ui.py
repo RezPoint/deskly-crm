@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Path
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Path as ApiPath
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, or_
 from sqlalchemy.orm import Session
@@ -195,7 +195,7 @@ def ui_create_order(
 @router.get("/orders/{order_id}")
 def ui_order_detail(
     request: Request,
-    order_id: int = Path(..., ge=1),
+    order_id: int = ApiPath(..., ge=1),
     db: Session = Depends(get_db),
 ):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
@@ -231,7 +231,7 @@ def ui_order_detail(
 @router.post("/orders/{order_id}/payments")
 def ui_add_payment(
     request: Request,
-    order_id: int = Path(..., ge=1),
+    order_id: int = ApiPath(..., ge=1),
     amount: str = Form(...),
     db: Session = Depends(get_db),
 ):
@@ -278,7 +278,7 @@ def ui_add_payment(
 
 @router.post("/orders/{order_id}/status")
 def ui_update_order_status(
-    order_id: int = Path(..., ge=1),
+    order_id: int = ApiPath(..., ge=1),
     status: str = Form(...),
     db: Session = Depends(get_db),
 ):
@@ -299,7 +299,7 @@ def ui_update_order_status(
 @router.post("/orders/{order_id}/price")
 def ui_update_order_price(
     request: Request,
-    order_id: int = Path(..., ge=1),
+    order_id: int = ApiPath(..., ge=1),
     price: str = Form(...),
     db: Session = Depends(get_db),
 ):
@@ -340,5 +340,3 @@ def ui_update_order_price(
     db.commit()
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
-    
-    
