@@ -28,8 +28,13 @@ def test_export_orders_filters_by_client_and_date(client):
         db.commit()
 
     date_from = (datetime.now(timezone.utc) - timedelta(days=1)).date().isoformat()
-    r = client.get(f"/api/export/orders.csv?client_id={client_id}&date_from={date_from}")
+    r = client.get(f"/api/export/orders.csv?client_id={client_id}&date_from={date_from}&q=New")
     assert r.status_code == 200
     body = r.text
     assert "Old" not in body
     assert "New" in body
+
+
+def test_export_orders_invalid_date_range(client):
+    r = client.get("/api/export/orders.csv?date_from=2026-01-10&date_to=2026-01-01")
+    assert r.status_code == 422

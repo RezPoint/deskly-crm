@@ -31,12 +31,17 @@ def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optio
 def export_orders_csv(
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     start_dt = _parse_date(date_from, "date_from", is_end=False)
     end_dt = _parse_date(date_to, "date_to", is_end=True)
+    if status and status not in {"new", "in_progress", "done", "canceled"}:
+        raise HTTPException(status_code=422, detail="status must be one of: new, in_progress, done, canceled")
+    if start_dt and end_dt and start_dt > end_dt:
+        raise HTTPException(status_code=422, detail="date_from must be <= date_to")
 
     # total paid per order
     paid_map = dict(
@@ -52,6 +57,9 @@ def export_orders_csv(
         stmt = stmt.where(Order.client_id == client_id)
     if status:
         stmt = stmt.where(Order.status == status)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where((Order.title.ilike(like)) | (Order.comment.ilike(like)))
     if start_dt:
         stmt = stmt.where(Order.created_at >= start_dt)
     if end_dt:

@@ -26,3 +26,13 @@ def test_list_orders_filters_by_date(client):
     titles = {o["title"] for o in r.json()}
     assert "Old" not in titles
     assert "New" in titles
+
+
+def test_list_orders_invalid_date_range(client):
+    r = client.post("/api/clients", json={"name": "Range Client"})
+    client_id = r.json()["id"]
+
+    client.post("/api/orders", json={"client_id": client_id, "title": "X", "price": 1})
+
+    r = client.get("/api/orders?date_from=2026-01-10&date_to=2026-01-01")
+    assert r.status_code == 422

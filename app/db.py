@@ -31,6 +31,15 @@ def init_db(bind_engine=None) -> None:
         Base.metadata.create_all(bind=bind_engine or engine)
 
 
+def run_migrations(database_url: Optional[str] = None) -> None:
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", database_url or DEFAULT_DB_URL)
+    command.upgrade(cfg, "head")
+
+
 def get_db(request: Request) -> Generator[Session, None, None]:
     """
     Берём SessionLocal из app.state (если app создан через create_app),

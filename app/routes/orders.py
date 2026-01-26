@@ -47,6 +47,8 @@ def list_orders(
 ):
     start_dt = _parse_date(date_from, "date_from", is_end=False)
     end_dt = _parse_date(date_to, "date_to", is_end=True)
+    if start_dt and end_dt and start_dt > end_dt:
+        raise HTTPException(status_code=422, detail="date_from must be <= date_to")
 
     if sort == "created_asc":
         stmt = select(Order).order_by(Order.id.asc())
