@@ -49,6 +49,10 @@ def test_viewer_restrictions_ui(client):
     r = viewer_client.post("/ui/clients", data={"name": "Nope"})
     assert r.status_code == 403
 
+    r = viewer_client.get("/ui/users", follow_redirects=False)
+    assert r.status_code in {302, 303}
+    assert r.headers["location"] == "/ui/clients"
+
 
 def test_setup_hidden_after_user_created(anon_client):
     anon_client.post("/setup", data={"email": "owner@site.com", "password": "secret123"}, follow_redirects=False)
