@@ -831,6 +831,8 @@ def ui_reminders(
     overdue: Optional[str] = Query(None),
     entity_type: Optional[str] = Query(None),
     entity_id: Optional[int] = Query(None, ge=1),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     stmt = select(Reminder).order_by(Reminder.due_at.asc())
@@ -843,7 +845,12 @@ def ui_reminders(
         stmt = stmt.where(Reminder.entity_type == entity_type)
     if entity_id:
         stmt = stmt.where(Reminder.entity_id == entity_id)
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    page_size = max(1, min(page_size, 200))
+    page = max(1, page)
+    stmt = stmt.limit(page_size).offset((page - 1) * page_size)
     reminders = db.execute(stmt).scalars().all()
+    total_pages = max(1, (total + page_size - 1) // page_size)
     open_count = db.execute(
         select(func.count()).select_from(
             select(Reminder.id).where(Reminder.status == "open").subquery()
@@ -867,6 +874,9 @@ def ui_reminders(
             "filter_overdue": overdue or "",
             "filter_entity_type": entity_type or "",
             "filter_entity_id": entity_id or "",
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
             "open_count": open_count,
             "overdue_count": overdue_count,
         },
