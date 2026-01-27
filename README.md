@@ -15,6 +15,7 @@ Keep your client work in one place: who requested what, what's in progress, what
 - **Status workflow** - `new` / `in_progress` / `done` / `canceled`
 - **Payments** - partial payments and balance tracking
 - **CSV export** - download orders as a report
+- **CSV import** - bulk import clients and orders
 - **Reminders** - due dates and linked entities
 - **Activity log** - audit trail for important actions
 
@@ -103,6 +104,13 @@ Environment variables:
 Endpoints:
 - `GET /health` returns `status`, `service`, `version`, `db`, `uptime_seconds`
 - `GET /metrics` exposes Prometheus metrics
+
+## CSV Import
+API endpoints:
+- `POST /api/import/clients` (multipart file `file`)
+  - Columns: `name` (required), `phone`, `telegram`, `notes`
+- `POST /api/import/orders` (multipart file `file`)
+  - Columns: `client_id` (required), `title` (required), `price` (required), `status` (optional), `comment`
 
 ## Auth (0.2)
 - First run: open `/setup` to create the owner account.
