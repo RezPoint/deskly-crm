@@ -16,26 +16,32 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        "invites",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("tenant_id", sa.Integer(), nullable=False),
-        sa.Column("email", sa.String(length=200), nullable=False),
-        sa.Column("role", sa.String(length=30), nullable=False, server_default="viewer"),
-        sa.Column("token", sa.String(length=128), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("accepted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("accepted_by", sa.Integer(), nullable=True),
-        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name="fk_invites_tenant_id"),
-        sa.ForeignKeyConstraint(["accepted_by"], ["users.id"], name="fk_invites_accepted_by"),
-        sa.UniqueConstraint("token", name="uq_invites_token"),
-    )
-    op.create_index("ix_invites_tenant_id", "invites", ["tenant_id"], unique=False)
-    op.create_index("ix_invites_token", "invites", ["token"], unique=True)
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "invites" not in inspector.get_table_names():
+        op.create_table(
+            "invites",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("tenant_id", sa.Integer(), nullable=False),
+            sa.Column("email", sa.String(length=200), nullable=False),
+            sa.Column("role", sa.String(length=30), nullable=False, server_default="viewer"),
+            sa.Column("token", sa.String(length=128), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+            sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("accepted_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("accepted_by", sa.Integer(), nullable=True),
+            sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name="fk_invites_tenant_id"),
+            sa.ForeignKeyConstraint(["accepted_by"], ["users.id"], name="fk_invites_accepted_by"),
+            sa.UniqueConstraint("token", name="uq_invites_token"),
+        )
+        op.create_index("ix_invites_tenant_id", "invites", ["tenant_id"], unique=False)
+        op.create_index("ix_invites_token", "invites", ["token"], unique=True)
 
 
 def downgrade():
-    op.drop_index("ix_invites_token", table_name="invites")
-    op.drop_index("ix_invites_tenant_id", table_name="invites")
-    op.drop_table("invites")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "invites" in inspector.get_table_names():
+        op.drop_index("ix_invites_token", table_name="invites")
+        op.drop_index("ix_invites_tenant_id", table_name="invites")
+        op.drop_table("invites")
