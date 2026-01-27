@@ -27,7 +27,7 @@
 
   <h3>Update status</h3>
   <form method="post" action="/ui/orders/{{ order.id }}/status" class="row">
-    <select name="status">
+    <select name="status" aria-label="Status">
       <option value="new" {% if order.status == "new" %}selected{% endif %}>new</option>
       <option value="in_progress" {% if order.status == "in_progress" %}selected{% endif %}>in_progress</option>
       <option value="done" {% if order.status == "done" %}selected{% endif %}>done</option>
@@ -38,7 +38,7 @@
 
   <h3>Update price</h3>
   <form method="post" action="/ui/orders/{{ order.id }}/price" class="row">
-    <input name="price" value="{{ price_input }}" type="number" min="0" step="0.01" />
+    <input name="price" value="{{ price_input }}" type="number" min="0" step="0.01" aria-label="Price" />
     <button type="submit">Save</button>
   </form>
 </div>
@@ -46,7 +46,7 @@
 <div class="card">
   <h3>Add payment</h3>
   <form method="post" action="/ui/orders/{{ order.id }}/payments" class="row">
-    <input name="amount" placeholder="Amount (e.g. 8000 or 8000.00)" value="{{ payment_amount }}" type="number" min="0.01" step="0.01" required />
+    <input name="amount" placeholder="Amount (e.g. 8000 or 8000.00)" value="{{ payment_amount }}" type="number" min="0.01" step="0.01" required aria-label="Payment amount" />
     <button type="submit">Add</button>
   </form>
 </div>

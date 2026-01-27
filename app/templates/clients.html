@@ -10,7 +10,7 @@
 
 <div class="card">
   <form method="get" action="/ui/clients" class="row">
-    <input name="q" placeholder="Search name/phone/telegram" value="{{ q }}" />
+    <input name="q" placeholder="Search name/phone/telegram" value="{{ q }}" aria-label="Search clients" />
     <select name="sort">
       <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
       <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
@@ -28,7 +28,7 @@
 <div class="card" id="add-client">
   <h3>Add client</h3>
   <form method="post" action="/ui/clients" class="row">
-    <input name="name" placeholder="Name *" value="{{ form_name }}" required />
+    <input name="name" placeholder="Name *" value="{{ form_name }}" required autofocus />
     <input name="phone" placeholder="Phone (+7 999 000-00-00)" value="{{ form_phone }}" type="tel" pattern="^[+\\d\\s()\\-]{3,25}$" title="Digits, spaces, +, -, parentheses (3-25 chars)" />
     <input name="telegram" placeholder="Telegram (@username)" value="{{ form_telegram }}" pattern="^@?[A-Za-z0-9_]{5,32}$" title="5-32 chars: letters, numbers, underscore" />
     <input name="notes" placeholder="Notes" value="{{ form_notes }}" />
