@@ -23,7 +23,7 @@
 </div>
 
 <div class="card">
-  <h3>⏰ Add reminder</h3>
+  <h3>Add reminder</h3>
   <form method="post" action="/api/reminders/ui" class="row">
     <input name="title" placeholder="Title" required />
     <input name="due_at" type="datetime-local" required />
@@ -34,7 +34,7 @@
 </div>
 
 <div class="card">
-  <h3>📒 List</h3>
+  <h3>List</h3>
   {% if reminders|length == 0 %}
     <p class="muted">No reminders yet.</p>
   {% else %}
@@ -45,6 +45,7 @@
           <th>Title</th>
           <th>Status</th>
           <th>Due</th>
+          <th>Linked</th>
           <th></th>
         </tr>
       </thead>
@@ -55,6 +56,13 @@
           <td>{{ r.title }}</td>
           <td><span class="pill {{ r.status }}">{{ r.status }}</span></td>
           <td class="muted">{{ r.due_at|dt }}</td>
+          <td class="muted">
+            {% if r.entity_type and r.entity_id %}
+              {{ r.entity_type }} #{{ r.entity_id }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
           <td class="actions">
             {% if r.status != "done" %}
               <form method="post" action="/api/reminders/ui/{{ r.id }}/done" class="inline">
