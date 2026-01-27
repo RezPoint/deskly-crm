@@ -1,0 +1,93 @@
+{% extends "layout.html" %}
+{% set title = "Reminders -- DesklyCRM" %}
+
+{% block content %}
+<h1>Reminders</h1>
+
+<div class="card">
+  <h3>Filters</h3>
+  <form method="get" action="/ui/reminders" class="row">
+    <select name="status">
+      <option value="">All</option>
+      <option value="open" {% if filter_status == "open" %}selected{% endif %}>open</option>
+      <option value="done" {% if filter_status == "done" %}selected{% endif %}>done</option>
+    </select>
+    <select name="overdue">
+      <option value="">All</option>
+      <option value="1" {% if filter_overdue == "1" %}selected{% endif %}>overdue only</option>
+    </select>
+    <input name="entity_type" placeholder="Entity (order/client)" value="{{ filter_entity_type }}" />
+    <input name="entity_id" placeholder="Entity ID" value="{{ filter_entity_id }}" />
+    <button type="submit">Apply</button>
+    <a class="muted" href="/ui/reminders">Reset</a>
+  </form>
+  <div class="row">
+    <span class="stat">Open {{ open_count }}</span>
+    <span class="stat">Overdue {{ overdue_count }}</span>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Add reminder</h3>
+  {% if request.state.user and request.state.user.role != "viewer" %}
+    <form method="post" action="/api/reminders/ui" class="row">
+      <input name="title" placeholder="Title" required />
+      <input name="due_at" type="datetime-local" required />
+      <input name="entity_type" placeholder="Entity (order/client)" />
+      <input name="entity_id" placeholder="Entity ID" />
+      <button type="submit">Create</button>
+    </form>
+  {% else %}
+    <p class="muted">Viewer role cannot create reminders.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>List</h3>
+  {% if reminders|length == 0 %}
+    <p class="muted">No reminders yet.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Due</th>
+          <th>Linked</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in reminders %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td>{{ r.title }}</td>
+          <td><span class="pill {{ r.status }}">{{ r.status }}</span></td>
+          <td class="muted">{{ r.due_at|dt }}</td>
+          <td class="muted">
+            {% if r.entity_type and r.entity_id %}
+              {{ r.entity_type }} #{{ r.entity_id }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td class="actions">
+            {% if request.state.user and request.state.user.role != "viewer" %}
+              {% if r.status != "done" %}
+                <form method="post" action="/api/reminders/ui/{{ r.id }}/done" class="inline">
+                  <button type="submit" class="btn-ghost">Done</button>
+                </form>
+              {% endif %}
+              <form method="post" action="/api/reminders/ui/{{ r.id }}/delete" class="inline" data-confirm="Delete reminder?">
+                <button type="submit" class="danger">Delete</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}

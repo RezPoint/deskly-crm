@@ -123,8 +123,10 @@
     {% if request and request.state and request.state.user and request.state.user.role != "viewer" %}
       <a href="/ui/users" class="{% if path.startswith('/ui/users') %}active{% endif %}">Users</a>
     {% endif %}
+    <a href="/ui/activity" class="{% if path.startswith('/ui/activity') %}active{% endif %}">Activity</a>
+    <a href="/ui/reminders" class="{% if path.startswith('/ui/reminders') %}active{% endif %}">Reminders</a>
     {% if request and request.state and request.state.user %}
-      <span class="muted">{{ request.state.user.email }} · {{ request.state.user.role }}</span>
+      <span class="muted">{{ request.state.user.email }} - {{ request.state.user.role }}</span>
       <form method="post" action="/logout" class="inline">
         <button type="submit" class="btn-ghost">Logout</button>
       </form>

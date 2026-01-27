@@ -64,3 +64,27 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(30), nullable=False, default="owner")  # owner/admin/viewer
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    action = Column(String(50), nullable=False)
+    entity_type = Column(String(30), nullable=False)
+    entity_id = Column(Integer, nullable=True)
+    message = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+
+
+class Reminder(Base):
+    __tablename__ = "reminders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    due_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="open")  # open/done
+    entity_type = Column(String(30), nullable=True)
+    entity_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)

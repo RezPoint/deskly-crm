@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from ..db import get_db
-from ..models import Client, Order, Payment
+from ..models import Client, Order, Payment, ActivityLog, Reminder
+from ..activity import log_activity
 from ..validators import validate_phone, validate_telegram
 
 router = APIRouter(prefix="/ui", tags=["ui"])
@@ -365,6 +366,8 @@ def ui_create_client(
             status_code=409,
         )
 
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "client.created", "client", c.id, c.name)
     return RedirectResponse(url="/ui/clients", status_code=303)
 
 
@@ -377,8 +380,11 @@ def ui_delete_client(
     client = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
     if client is None:
         raise HTTPException(status_code=404, detail="client not found")
+    name = client.name
     db.delete(client)
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "client.deleted", "client", client_id, name)
     return RedirectResponse(url="/ui/clients", status_code=303)
 
 
@@ -487,6 +493,8 @@ def ui_create_order(
     db.add(o)
     db.commit()
     db.refresh(o)
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "order.created", "order", o.id, o.title)
 
     return RedirectResponse(url=f"/ui/orders/{o.id}", status_code=303)
 
@@ -500,8 +508,11 @@ def ui_delete_order(
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
+    title = order.title
     db.delete(order)
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "order.deleted", "order", order_id, title)
     return RedirectResponse(url="/ui/orders", status_code=303)
 
 
@@ -621,6 +632,8 @@ def ui_add_payment(
     p = Payment(order_id=order_id, amount=amount_dec)
     db.add(p)
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "payment.created", "payment", p.id, str(p.amount))
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
@@ -637,11 +650,14 @@ def ui_delete_payment(
     order_id = payment.order_id
     db.delete(payment)
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "payment.deleted", "payment", payment_id, str(payment.amount))
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
 
 @router.post("/orders/{order_id}/status")
 def ui_update_order_status(
+    request: Request,
     order_id: int,
     status: str = Form(...),
     db: Session = Depends(get_db),
@@ -656,6 +672,8 @@ def ui_update_order_status(
 
     order.status = status
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "order.status_updated", "order", order_id, status)
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
@@ -733,7 +751,89 @@ def ui_update_order_price(
 
     order.price = new_price
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "order.price_updated", "order", order_id, str(new_price))
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
+
+
+@router.get("/activity")
+def ui_activity(
+    request: Request,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    stmt = select(ActivityLog).order_by(ActivityLog.id.desc())
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    logs = db.execute(stmt.limit(limit).offset(offset)).scalars().all()
+    page = (offset // limit) + 1
+    total_pages = max(1, (total + limit - 1) // limit)
+    return templates.TemplateResponse(
+        request,
+        "activity.html",
+        {
+            "request": request,
+            "logs": logs,
+            "filter_user_id": "",
+            "filter_entity_type": "",
+            "filter_action": "",
+            "filter_date_from": "",
+            "filter_date_to": "",
+            "page": page,
+            "total_pages": total_pages,
+            "limit": limit,
+            "offset": offset,
+        },
+    )
+
+
+@router.get("/reminders")
+def ui_reminders(
+    request: Request,
+    status: Optional[str] = Query(None),
+    overdue: Optional[str] = Query(None),
+    entity_type: Optional[str] = Query(None),
+    entity_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db),
+):
+    stmt = select(Reminder).order_by(Reminder.due_at.asc())
+    if status in {"open", "done"}:
+        stmt = stmt.where(Reminder.status == status)
+    if overdue == "1":
+        stmt = stmt.where(Reminder.status == "open")
+        stmt = stmt.where(Reminder.due_at < datetime.utcnow())
+    if entity_type:
+        stmt = stmt.where(Reminder.entity_type == entity_type)
+    if entity_id:
+        stmt = stmt.where(Reminder.entity_id == entity_id)
+    reminders = db.execute(stmt).scalars().all()
+    open_count = db.execute(
+        select(func.count()).select_from(
+            select(Reminder.id).where(Reminder.status == "open").subquery()
+        )
+    ).scalar_one()
+    overdue_count = db.execute(
+        select(func.count()).select_from(
+            select(Reminder.id)
+            .where(Reminder.status == "open")
+            .where(Reminder.due_at < datetime.utcnow())
+            .subquery()
+        )
+    ).scalar_one()
+    return templates.TemplateResponse(
+        request,
+        "reminders.html",
+        {
+            "request": request,
+            "reminders": reminders,
+            "filter_status": status or "",
+            "filter_overdue": overdue or "",
+            "filter_entity_type": entity_type or "",
+            "filter_entity_id": entity_id or "",
+            "open_count": open_count,
+            "overdue_count": overdue_count,
+        },
+    )
     
     

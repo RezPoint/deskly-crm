@@ -1,7 +1,7 @@
 from typing import List, Optional
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, time
 
@@ -17,6 +17,7 @@ from ..schemas import (
     OrderSummaryOut,
     OrderPriceUpdate,
 )
+from ..activity import log_activity
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -87,12 +88,15 @@ def get_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
 
 
 @router.delete("/{order_id}", status_code=204)
-def delete_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+def delete_order(request: Request, order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
+    title = order.title
     db.delete(order)
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "order.deleted", "order", order_id, title)
 
 
 @router.get("/{order_id}/summary", response_model=OrderSummaryOut)
@@ -169,7 +173,7 @@ def orders_summary(
 
 @router.patch("/{order_id}/status", response_model=OrderOut)
 def update_order_status(
-    order_id: int, payload: OrderStatusUpdate, db: Session = Depends(get_db)
+    order_id: int, payload: OrderStatusUpdate, request: Request, db: Session = Depends(get_db)
 ):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
@@ -178,11 +182,13 @@ def update_order_status(
     order.status = payload.status.value
     db.commit()
     db.refresh(order)
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "order.status_updated", "order", order_id, order.status)
     return order
 
 
 @router.patch("/{order_id}/price", response_model=OrderOut)
-def update_order_price(order_id: int, payload: OrderPriceUpdate, db: Session = Depends(get_db)):
+def update_order_price(order_id: int, payload: OrderPriceUpdate, request: Request, db: Session = Depends(get_db)):
     order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
@@ -199,11 +205,13 @@ def update_order_price(order_id: int, payload: OrderPriceUpdate, db: Session = D
     order.price = payload.price
     db.commit()
     db.refresh(order)
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "order.price_updated", "order", order_id, str(order.price))
     return order
 
 
 @router.post("", response_model=OrderOut)
-def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
+def create_order(payload: OrderCreate, request: Request, db: Session = Depends(get_db)):
     client_id = db.execute(select(Client.id).where(Client.id == payload.client_id)).scalar_one_or_none()
     if client_id is None:
         raise HTTPException(status_code=404, detail="client not found")
@@ -224,4 +232,6 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     db.add(o)
     db.commit()
     db.refresh(o)
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "order.created", "order", o.id, o.title)
     return o

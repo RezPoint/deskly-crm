@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, or_
@@ -9,6 +9,7 @@ from ..db import get_db
 from ..models import Client
 from ..schemas import ClientCreate, ClientOut
 from ..validators import validate_phone, validate_telegram
+from ..activity import log_activity
 
 router = APIRouter(prefix="/api/clients", tags=["clients"])
 
@@ -58,16 +59,19 @@ def get_client(client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
 
 
 @router.delete("/{client_id}", status_code=204)
-def delete_client(client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+def delete_client(request: Request, client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     c = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
     if c is None:
         raise HTTPException(status_code=404, detail="client not found")
+    name = c.name
     db.delete(c)
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "client.deleted", "client", client_id, name)
 
 
 @router.post("", response_model=ClientOut)
-def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
+def create_client(payload: ClientCreate, request: Request, db: Session = Depends(get_db)):
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="name must not be empty")
@@ -114,4 +118,6 @@ def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
             detail="client with same phone/telegram already exists",
         )
     db.refresh(c)
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "client.created", "client", c.id, f"{c.name}")
     return c
