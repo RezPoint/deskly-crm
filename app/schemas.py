@@ -88,3 +88,21 @@ class PaymentOut(APIModel):
     order_id: int
     amount: Money
     created_at: datetime
+
+
+class UserRole(str, Enum):
+    owner = "owner"
+    admin = "admin"
+    viewer = "viewer"
+
+
+class UserOut(APIModel):
+    id: int
+    email: str
+    role: UserRole
+    created_at: datetime
+
+
+class LoginIn(APIModel):
+    email: str
+    password: str

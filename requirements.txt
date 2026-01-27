@@ -11,3 +11,5 @@ python-multipart>=0.0.9
 psycopg[binary]
 alembic
 prometheus-client
+passlib
+python-jose

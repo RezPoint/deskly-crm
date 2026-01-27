@@ -7,9 +7,9 @@ import time
 import uuid
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, RedirectResponse
 from sqlalchemy import text
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
@@ -21,6 +21,8 @@ from .routes.orders import router as orders_router
 from .routes.payments import router as payments_router
 from .routes.export import router as export_router
 from .routes.ui import router as ui_router
+from .routes.auth import router as auth_router
+from .auth import PUBLIC_PATHS, get_current_user, has_users
 
 
 REQUEST_COUNT = Counter(
@@ -65,6 +67,38 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
     app.state.start_time = time.time()
 
     @app.middleware("http")
+    async def auth_middleware(request, call_next):
+        path = request.url.path
+        if path.startswith("/static") or path in PUBLIC_PATHS or path.startswith("/redoc"):
+            request.state.user = None
+            return await call_next(request)
+
+        db = SessionLocal()
+        try:
+            if not has_users(db):
+                if path.startswith("/ui"):
+                    return RedirectResponse(url="/setup", status_code=303)
+                if path.startswith("/api"):
+                    return JSONResponse({"detail": "setup required"}, status_code=503)
+                request.state.user = None
+                return await call_next(request)
+
+            try:
+                user = get_current_user(request, db)
+            except HTTPException as exc:
+                if path.startswith("/ui"):
+                    return RedirectResponse(url="/login", status_code=303)
+                return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+            request.state.user = user
+            if request.method in {"POST", "PUT", "PATCH", "DELETE"} and user.role == "viewer":
+                if path.startswith("/ui"):
+                    return HTMLResponse("Forbidden", status_code=403)
+                return JSONResponse({"detail": "forbidden"}, status_code=403)
+            return await call_next(request)
+        finally:
+            db.close()
+
+    @app.middleware("http")
     async def log_requests(request, call_next):
         request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
         start = time.perf_counter()
@@ -101,6 +135,7 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
         return response
 
     # API
+    app.include_router(auth_router)
     app.include_router(clients_router)
     app.include_router(orders_router)
     app.include_router(payments_router)
