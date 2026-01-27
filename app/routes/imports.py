@@ -51,8 +51,14 @@ def _process_clients(rows: list[dict], db: Session) -> tuple[int, list[str]]:
         try:
             phone = validate_phone(phone)
             telegram = validate_telegram(telegram)
-        except ValueError as exc:
-            errors.append(f"row {idx}: {exc}")
+        except ValueError:
+            field_errors = []
+            if row.get("phone"):
+                field_errors.append("invalid phone")
+            if row.get("telegram"):
+                field_errors.append("invalid telegram")
+            message = ", ".join(field_errors) if field_errors else "invalid contact data"
+            errors.append(f"row {idx}: {message}")
             continue
         db.add(Client(name=name, phone=phone, telegram=telegram, notes=notes))
         created += 1
