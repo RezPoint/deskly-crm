@@ -757,6 +757,7 @@ def ui_update_order_price(
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
 
+
 @router.get("/activity")
 def ui_activity(
     request: Request,
@@ -823,8 +824,6 @@ def ui_activity(
             "offset": offset,
         },
     )
-
-
 @router.get("/reminders")
 def ui_reminders(
     request: Request,
