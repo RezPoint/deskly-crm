@@ -17,8 +17,8 @@
     <select name="sort">
       <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
       <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
-      <option value="price_desc" {% if filter_sort == "price_desc" %}selected{% endif %}>Price high→low</option>
-      <option value="price_asc" {% if filter_sort == "price_asc" %}selected{% endif %}>Price low→high</option>
+      <option value="price_desc" {% if filter_sort == "price_desc" %}selected{% endif %}>Price high->low</option>
+      <option value="price_asc" {% if filter_sort == "price_asc" %}selected{% endif %}>Price low->high</option>
     </select>
     <select name="client_id">
       <option value="">All clients</option>
@@ -44,7 +44,7 @@
 </div>
 
 <div class="card" id="add-order">
-  <h3>🧾 Add order</h3>
+  <h3>Add order</h3>
   {% if request.state.user and request.state.user.role != "viewer" %}
     <form method="post" action="/ui/orders" class="row">
       <select name="client_id" required aria-label="Client">
@@ -70,7 +70,7 @@
 </div>
 
 <div class="card">
-  <h3>📦 List</h3>
+  <h3>List</h3>
   {% if orders|length == 0 %}
     <p class="muted">No orders yet. Create one to start tracking payments.</p>
     <div class="row">

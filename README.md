@@ -4,18 +4,19 @@
 [![CodeQL](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml/badge.svg)](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/RezPoint/deskly-crm)](https://github.com/RezPoint/deskly-crm/releases)
 
-DesklyCRM is a lightweight client & order manager for freelancers and small businesses - track requests, statuses, payments, and export reports in CSV.
+DesklyCRM is a lightweight client and order manager for freelancers and small businesses - track requests, statuses, payments, reminders, and export reports in CSV.
 
 ## Why DesklyCRM
-Keep your client work in one place: who requested what, whats in progress, whats paid, and whats done - without heavy CRMs.
+Keep your client work in one place: who requested what, what's in progress, what's paid, and what's done - without heavy CRMs.
 
 ## Features (MVP)
 - **Clients directory** - contacts, notes, quick lookup
 - **Orders tracking** - title, price, comments, linked client
 - **Status workflow** - `new` / `in_progress` / `done` / `canceled`
-- **Payments** - `paid` / `unpaid` (optional field for MVP)
+- **Payments** - partial payments and balance tracking
 - **CSV export** - download orders as a report
-- **UI polish** - fast status edits, better empty states, validation hints
+- **Reminders** - due dates and linked entities
+- **Activity log** - audit trail for important actions
 
 ## Tech Stack
 - **Backend:** FastAPI (Python)
@@ -30,10 +31,13 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Open in your browser: http://127.0.0.1:8000
+Open in your browser:
+- http://127.0.0.1:8000/setup (first run only)
+- http://127.0.0.1:8000/login
+- http://127.0.0.1:8000/ui/clients
+
 Health: http://127.0.0.1:8000/health
 Metrics: http://127.0.0.1:8000/metrics
-UI: http://127.0.0.1:8000/ui/clients
 
 ## Docker (Recommended)
 ```bash

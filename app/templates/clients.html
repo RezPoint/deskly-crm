@@ -15,8 +15,8 @@
     <select name="sort">
       <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
       <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
-      <option value="name_asc" {% if filter_sort == "name_asc" %}selected{% endif %}>Name A→Z</option>
-      <option value="name_desc" {% if filter_sort == "name_desc" %}selected{% endif %}>Name Z→A</option>
+      <option value="name_asc" {% if filter_sort == "name_asc" %}selected{% endif %}>Name A->Z</option>
+      <option value="name_desc" {% if filter_sort == "name_desc" %}selected{% endif %}>Name Z->A</option>
     </select>
     <button type="submit">Search</button>
     <a class="muted" href="/ui/clients">Reset</a>
@@ -27,7 +27,7 @@
 </div>
 
 <div class="card" id="add-client">
-  <h3>➕ Add client</h3>
+  <h3>Add client</h3>
   {% if request.state.user and request.state.user.role != "viewer" %}
     <form method="post" action="/ui/clients" class="row">
       <input name="name" placeholder="Name *" value="{{ form_name }}" required autofocus />
@@ -43,7 +43,7 @@
 </div>
 
 <div class="card">
-  <h3>📒 List</h3>
+  <h3>List</h3>
   {% if clients|length == 0 %}
     <p class="muted">No clients yet. Add your first client to start tracking orders.</p>
     <div class="row">
@@ -67,13 +67,13 @@
         <td>{{ c.name }}</td>
         <td>
           {% if c.phone %}
-            <span class="tag">📞 {{ c.phone }}</span>
+            <span class="tag">Phone: {{ c.phone }}</span>
           {% endif %}
           {% if c.telegram %}
-            <span class="tag">✈️ {{ c.telegram }}</span>
+            <span class="tag">Telegram: {{ c.telegram }}</span>
           {% endif %}
           {% if not c.phone and not c.telegram %}
-            <span class="muted">—</span>
+            <span class="muted">-</span>
           {% endif %}
         </td>
         <td class="muted">{{ c.created_at|dt }}</td>
