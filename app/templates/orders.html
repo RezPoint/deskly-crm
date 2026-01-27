@@ -85,7 +85,7 @@
           <th>ID</th>
           <th>Client</th>
           <th>Title</th>
-          <th>Status</th>
+        <th>Status</th>
           <th>Price</th>
           <th>Paid</th>
           <th>Balance</th>
@@ -99,7 +99,17 @@
           <td>{{ o.id }}</td>
           <td>{{ (client_map.get(o.client_id).name if client_map.get(o.client_id) else o.client_id) }}</td>
           <td>{{ o.title }}</td>
-          <td>{{ o.status }}</td>
+        <td>
+          <form method="post" action="/ui/orders/{{ o.id }}/status" class="row">
+            <select name="status">
+              <option value="new" {% if o.status == "new" %}selected{% endif %}>new</option>
+              <option value="in_progress" {% if o.status == "in_progress" %}selected{% endif %}>in_progress</option>
+              <option value="done" {% if o.status == "done" %}selected{% endif %}>done</option>
+              <option value="canceled" {% if o.status == "canceled" %}selected{% endif %}>canceled</option>
+            </select>
+            <button type="submit">Save</button>
+          </form>
+        </td>
           <td>{{ o.price|money }}</td>
           <td>{{ (paid_map.get(o.id, 0))|money }}</td>
           <td>{{ (o.price - paid_map.get(o.id, 0))|money }}</td>

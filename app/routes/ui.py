@@ -15,6 +15,7 @@ from starlette.responses import RedirectResponse
 
 from ..db import get_db
 from ..models import Client, Order, Payment
+from ..validators import validate_phone, validate_telegram
 
 router = APIRouter(prefix="/ui", tags=["ui"])
 
@@ -283,6 +284,30 @@ def ui_create_client(
     phone_clean = phone.strip() if phone else None
     telegram_clean = telegram.strip() if telegram else None
     notes_clean = notes.strip() if notes else None
+
+    try:
+        phone_clean = validate_phone(phone_clean)
+        telegram_clean = validate_telegram(telegram_clean)
+    except ValueError as exc:
+        return templates.TemplateResponse(
+            request,
+            "clients.html",
+            {
+                "request": request,
+                "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
+                "q": "",
+                "filter_sort": "created_desc",
+                "page": 1,
+                "page_size": 50,
+                "total_pages": 1,
+                "form_name": name,
+                "form_phone": phone or "",
+                "form_telegram": telegram or "",
+                "form_notes": notes or "",
+                "error": str(exc),
+            },
+            status_code=422,
+        )
 
     # простая защита от дублей: если совпадает phone ИЛИ telegram -- считаем дубль
     conditions = []
