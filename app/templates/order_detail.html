@@ -51,30 +51,34 @@
 
 <div class="card">
   <h3>Payments</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Amount</th>
-        <th>Created</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for p in payments %}
-      <tr>
-        <td>{{ p.id }}</td>
-        <td>{{ p.amount|money }}</td>
-        <td class="muted">{{ p.created_at|dt }}</td>
-        <td class="actions">
-          <form method="post" action="/ui/payments/{{ p.id }}/delete" class="inline" data-confirm="Delete payment?">
-            <button type="submit" class="danger">Delete</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  {% if payments|length == 0 %}
+    <p class="muted">No payments yet. Add the first payment above.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Amount</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in payments %}
+        <tr>
+          <td>{{ p.id }}</td>
+          <td>{{ p.amount|money }}</td>
+          <td class="muted">{{ p.created_at|dt }}</td>
+          <td class="actions">
+            <form method="post" action="/ui/payments/{{ p.id }}/delete" class="inline" data-confirm="Delete payment?">
+              <button type="submit" class="danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 </div>
 
 <p><a href="/ui/orders">← Back to orders</a></p>

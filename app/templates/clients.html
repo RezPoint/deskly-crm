@@ -25,7 +25,7 @@
   </div>
 </div>
 
-<div class="card">
+<div class="card" id="add-client">
   <h3>Add client</h3>
   <form method="post" action="/ui/clients" class="row">
     <input name="name" placeholder="Name *" value="{{ form_name }}" required />
@@ -39,44 +39,48 @@
 <div class="card">
   <h3>List</h3>
   {% if clients|length == 0 %}
-    <p class="muted">No clients yet. Add your first client above.</p>
+    <p class="muted">No clients yet. Add your first client to start tracking orders.</p>
+    <div class="row">
+      <a href="#add-client">Add client</a>
+    </div>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Telegram</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in clients %}
+        <tr>
+          <td>{{ c.id }}</td>
+          <td>{{ c.name }}</td>
+          <td>{{ c.phone or "" }}</td>
+          <td>{{ c.telegram or "" }}</td>
+          <td class="muted">{{ c.created_at|dt }}</td>
+          <td class="actions">
+            <form method="post" action="/ui/clients/{{ c.id }}/delete" class="inline" data-confirm="Delete client and all related orders/payments?">
+              <button type="submit" class="danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="row">
+      <span class="muted">Page {{ page }} / {{ total_pages }}</span>
+      {% if page > 1 %}
+        <a href="/ui/clients?q={{ q }}&sort={{ filter_sort }}&page={{ page - 1 }}&page_size={{ page_size }}">Prev</a>
+      {% endif %}
+      {% if page < total_pages %}
+        <a href="/ui/clients?q={{ q }}&sort={{ filter_sort }}&page={{ page + 1 }}&page_size={{ page_size }}">Next</a>
+      {% endif %}
+    </div>
   {% endif %}
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>Phone</th>
-        <th>Telegram</th>
-        <th>Created</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for c in clients %}
-      <tr>
-        <td>{{ c.id }}</td>
-        <td>{{ c.name }}</td>
-        <td>{{ c.phone or "" }}</td>
-        <td>{{ c.telegram or "" }}</td>
-        <td class="muted">{{ c.created_at|dt }}</td>
-        <td class="actions">
-          <form method="post" action="/ui/clients/{{ c.id }}/delete" class="inline" data-confirm="Delete client and all related orders/payments?">
-            <button type="submit" class="danger">Delete</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  <div class="row">
-    <span class="muted">Page {{ page }} / {{ total_pages }}</span>
-    {% if page > 1 %}
-      <a href="/ui/clients?q={{ q }}&sort={{ filter_sort }}&page={{ page - 1 }}&page_size={{ page_size }}">Prev</a>
-    {% endif %}
-    {% if page < total_pages %}
-      <a href="/ui/clients?q={{ q }}&sort={{ filter_sort }}&page={{ page + 1 }}&page_size={{ page_size }}">Next</a>
-    {% endif %}
-  </div>
 </div>
 {% endblock %}
