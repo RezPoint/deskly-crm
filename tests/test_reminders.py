@@ -51,3 +51,14 @@ def test_ui_reminder_with_entity(client):
         follow_redirects=False,
     )
     assert r.status_code in {302, 303}
+
+
+def test_ui_reminders_pagination(client):
+    due_at = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    for i in range(3):
+        r = client.post("/api/reminders", json={"title": f"Page {i}", "due_at": due_at})
+        assert r.status_code == 200
+
+    r = client.get("/ui/reminders", params={"page": 1, "page_size": 2})
+    assert r.status_code == 200
+    assert "Page 1 / 2" in r.text

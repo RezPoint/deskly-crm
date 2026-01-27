@@ -27,6 +27,7 @@ def list_reminders(
     entity_type: Optional[str] = Query(None),
     entity_id: Optional[int] = Query(None, ge=1),
     limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
@@ -40,7 +41,7 @@ def list_reminders(
         stmt = stmt.where(Reminder.entity_type == entity_type)
     if entity_id:
         stmt = stmt.where(Reminder.entity_id == entity_id)
-    stmt = stmt.limit(limit)
+    stmt = stmt.limit(limit).offset(offset)
     return db.execute(stmt).scalars().all()
 
 

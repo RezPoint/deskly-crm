@@ -88,6 +88,15 @@
       {% endfor %}
       </tbody>
     </table>
+    <div class="row">
+      <span class="muted">Page {{ page }} / {{ total_pages }}</span>
+      {% if page > 1 %}
+        <a href="/ui/reminders?status={{ filter_status }}&overdue={{ filter_overdue }}&entity_type={{ filter_entity_type }}&entity_id={{ filter_entity_id }}&page={{ page - 1 }}&page_size={{ page_size }}">Prev</a>
+      {% endif %}
+      {% if page < total_pages %}
+        <a href="/ui/reminders?status={{ filter_status }}&overdue={{ filter_overdue }}&entity_type={{ filter_entity_type }}&entity_id={{ filter_entity_id }}&page={{ page + 1 }}&page_size={{ page_size }}">Next</a>
+      {% endif %}
+    </div>
   {% endif %}
 </div>
 {% endblock %}
