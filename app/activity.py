@@ -14,8 +14,11 @@ def log_activity(
     entity_type: str,
     entity_id: Optional[int] = None,
     message: Optional[str] = None,
+    tenant_id: Optional[int] = None,
 ) -> None:
+    tenant_value = tenant_id or 1
     entry = ActivityLog(
+        tenant_id=tenant_value,
         user_id=user_id,
         action=action,
         entity_type=entity_type,

@@ -36,6 +36,7 @@ def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optio
 
 @router.get("", response_model=List[OrderOut])
 def list_orders(
+    request: Request,
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[OrderStatus] = None,
     q: Optional[str] = Query(None, min_length=1, max_length=200),
@@ -51,6 +52,9 @@ def list_orders(
     if start_dt and end_dt and start_dt > end_dt:
         raise HTTPException(status_code=422, detail="date_from must be <= date_to")
 
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+
     if sort == "created_asc":
         stmt = select(Order).order_by(Order.id.asc())
     elif sort == "price_desc":
@@ -60,6 +64,7 @@ def list_orders(
     else:
         stmt = select(Order).order_by(Order.id.desc())
 
+    stmt = stmt.where(Order.tenant_id == tenant_id)
     if client_id is not None:
         stmt = stmt.where(Order.client_id == client_id)
 
@@ -80,8 +85,12 @@ def list_orders(
 
 
 @router.get("/{order_id}", response_model=OrderOut)
-def get_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
-    o = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+def get_order(request: Request, order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    o = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if o is None:
         raise HTTPException(status_code=404, detail="order not found")
     return o
@@ -89,24 +98,41 @@ def get_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
 
 @router.delete("/{order_id}", status_code=204)
 def delete_order(request: Request, order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
     title = order.title
     db.delete(order)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "order.deleted", "order", order_id, title)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "order.deleted",
+        "order",
+        order_id,
+        title,
+        tenant_id=tenant_id,
+    )
 
 
 @router.get("/{order_id}/summary", response_model=OrderSummaryOut)
-def order_summary(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+def order_summary(request: Request, order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
     paid_total_raw = db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
     ).scalar_one()
 
     paid_total = Decimal(str(paid_total_raw))
@@ -123,6 +149,7 @@ def order_summary(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)
 
 @router.get("/summary/total", response_model=OrderSummaryOut)
 def orders_summary(
+    request: Request,
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[OrderStatus] = None,
     date_from: Optional[str] = Query(None),
@@ -134,7 +161,10 @@ def orders_summary(
     if start_dt and end_dt and start_dt > end_dt:
         raise HTTPException(status_code=422, detail="date_from must be <= date_to")
 
-    stmt = select(func.coalesce(func.sum(Order.price), 0))
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+
+    stmt = select(func.coalesce(func.sum(Order.price), 0)).where(Order.tenant_id == tenant_id)
     if client_id is not None:
         stmt = stmt.where(Order.client_id == client_id)
     if status is not None:
@@ -147,8 +177,10 @@ def orders_summary(
     total_price_raw = db.execute(stmt).scalar_one()
     total_price = Decimal(str(total_price_raw))
 
-    paid_stmt = select(func.coalesce(func.sum(Payment.amount), 0)).join(
-        Order, Order.id == Payment.order_id
+    paid_stmt = (
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .join(Order, Order.id == Payment.order_id)
+        .where(Payment.tenant_id == tenant_id)
     )
     if client_id is not None:
         paid_stmt = paid_stmt.where(Order.client_id == client_id)
@@ -175,7 +207,11 @@ def orders_summary(
 def update_order_status(
     order_id: int, payload: OrderStatusUpdate, request: Request, db: Session = Depends(get_db)
 ):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
@@ -183,19 +219,32 @@ def update_order_status(
     db.commit()
     db.refresh(order)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "order.status_updated", "order", order_id, order.status)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "order.status_updated",
+        "order",
+        order_id,
+        order.status,
+        tenant_id=tenant_id,
+    )
     return order
 
 
 @router.patch("/{order_id}/price", response_model=OrderOut)
 def update_order_price(order_id: int, payload: OrderPriceUpdate, request: Request, db: Session = Depends(get_db)):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
     # нельзя уменьшить цену ниже уже оплаченной суммы
     paid_total_raw = db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
     ).scalar_one()
 
     paid_total = Decimal(str(paid_total_raw))
@@ -206,13 +255,25 @@ def update_order_price(order_id: int, payload: OrderPriceUpdate, request: Reques
     db.commit()
     db.refresh(order)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "order.price_updated", "order", order_id, str(order.price))
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "order.price_updated",
+        "order",
+        order_id,
+        str(order.price),
+        tenant_id=tenant_id,
+    )
     return order
 
 
 @router.post("", response_model=OrderOut)
 def create_order(payload: OrderCreate, request: Request, db: Session = Depends(get_db)):
-    client_id = db.execute(select(Client.id).where(Client.id == payload.client_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    client_id = db.execute(
+        select(Client.id).where(Client.id == payload.client_id, Client.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if client_id is None:
         raise HTTPException(status_code=404, detail="client not found")
 
@@ -223,6 +284,7 @@ def create_order(payload: OrderCreate, request: Request, db: Session = Depends(g
     comment = payload.comment.strip() if payload.comment else None
 
     o = Order(
+        tenant_id=tenant_id,
         client_id=payload.client_id,
         title=title,
         price=payload.price,
@@ -233,5 +295,13 @@ def create_order(payload: OrderCreate, request: Request, db: Session = Depends(g
     db.commit()
     db.refresh(o)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "order.created", "order", o.id, o.title)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "order.created",
+        "order",
+        o.id,
+        o.title,
+        tenant_id=tenant_id,
+    )
     return o

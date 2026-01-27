@@ -10,6 +10,7 @@ from ..db import get_db
 from ..models import Client, Order
 from ..validators import validate_phone, validate_telegram
 from ..activity import log_activity
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -32,11 +33,13 @@ def _read_csv(upload: UploadFile) -> list[dict]:
     return rows
 
 
-def _process_clients(rows: list[dict], db: Session) -> tuple[int, list[str]]:
+def _process_clients(rows: list[dict], db: Session, tenant_id: int) -> tuple[int, list[str]]:
     required = {"name"}
     errors: list[str] = []
     created = 0
-    existing_rows = db.execute(select(Client.phone, Client.telegram)).all()
+    existing_rows = db.execute(
+        select(Client.phone, Client.telegram).where(Client.tenant_id == tenant_id)
+    ).all()
     existing_phones = {row[0] for row in existing_rows if row[0]}
     existing_telegrams = {row[1] for row in existing_rows if row[1]}
     seen_phones: set[str] = set()
@@ -83,12 +86,20 @@ def _process_clients(rows: list[dict], db: Session) -> tuple[int, list[str]]:
             seen_phones.add(phone)
         if telegram:
             seen_telegrams.add(telegram)
-        db.add(Client(name=name, phone=phone, telegram=telegram, notes=notes))
+        db.add(
+            Client(
+                tenant_id=tenant_id,
+                name=name,
+                phone=phone,
+                telegram=telegram,
+                notes=notes,
+            )
+        )
         created += 1
     return created, errors
 
 
-def _process_orders(rows: list[dict], db: Session) -> tuple[int, list[str]]:
+def _process_orders(rows: list[dict], db: Session, tenant_id: int) -> tuple[int, list[str]]:
     required = {"client_id", "title", "price"}
     allowed_statuses = {"new", "in_progress", "done", "canceled"}
     errors: list[str] = []
@@ -96,7 +107,15 @@ def _process_orders(rows: list[dict], db: Session) -> tuple[int, list[str]]:
 
     client_ids = {int(r["client_id"]) for r in rows if (r.get("client_id") or "").isdigit()}
     if client_ids:
-        existing = set(db.execute(select(Client.id).where(Client.id.in_(client_ids))).scalars().all())
+        existing = set(
+            db.execute(
+                select(Client.id).where(
+                    Client.id.in_(client_ids), Client.tenant_id == tenant_id
+                )
+            )
+            .scalars()
+            .all()
+        )
     else:
         existing = set()
 
@@ -129,7 +148,16 @@ def _process_orders(rows: list[dict], db: Session) -> tuple[int, list[str]]:
         if price < Decimal("0.00"):
             errors.append(f"row {idx}: price must be >= 0")
             continue
-        db.add(Order(client_id=client_id, title=title, price=price, status=status, comment=comment))
+        db.add(
+            Order(
+                tenant_id=tenant_id,
+                client_id=client_id,
+                title=title,
+                price=price,
+                status=status,
+                comment=comment,
+            )
+        )
         created += 1
     return created, errors
 
@@ -141,11 +169,13 @@ def import_clients(
     dry_run: bool = Query(False),
     db: Session = Depends(get_db),
 ):
+    get_current_user(request, db)
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
     rows = _read_csv(file)
     if not rows:
         return {"created": 0}
 
-    created, errors = _process_clients(rows, db)
+    created, errors = _process_clients(rows, db, tenant_id)
 
     if errors:
         db.rollback()
@@ -159,7 +189,15 @@ def import_clients(
     user = getattr(request.state, "user", None)
     if user:
         for _ in range(created):
-            log_activity(db, getattr(user, "id", None), "client.created", "client", None, "CSV import")
+            log_activity(
+                db,
+                getattr(user, "id", None),
+                "client.created",
+                "client",
+                None,
+                "CSV import",
+                tenant_id=tenant_id,
+            )
     return {"created": created}
 
 
@@ -170,11 +208,13 @@ def import_orders(
     dry_run: bool = Query(False),
     db: Session = Depends(get_db),
 ):
+    get_current_user(request, db)
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
     rows = _read_csv(file)
     if not rows:
         return {"created": 0}
 
-    created, errors = _process_orders(rows, db)
+    created, errors = _process_orders(rows, db, tenant_id)
 
     if errors:
         db.rollback()
@@ -188,5 +228,13 @@ def import_orders(
     user = getattr(request.state, "user", None)
     if user:
         for _ in range(created):
-            log_activity(db, getattr(user, "id", None), "order.created", "order", None, "CSV import")
+            log_activity(
+                db,
+                getattr(user, "id", None),
+                "order.created",
+                "order",
+                None,
+                "CSV import",
+                tenant_id=tenant_id,
+            )
     return {"created": created}

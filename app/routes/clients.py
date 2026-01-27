@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/clients", tags=["clients"])
 
 @router.get("", response_model=List[ClientOut])
 def list_clients(
+    request: Request,
     q: Optional[str] = Query(
         None,
         min_length=1,
@@ -27,6 +28,9 @@ def list_clients(
     sort: str = Query("created_desc", pattern="^(created_desc|created_asc|name_asc|name_desc)$"),
     db: Session = Depends(get_db),
 ):
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+
     if sort == "created_asc":
         stmt = select(Client).order_by(Client.id.asc())
     elif sort == "name_asc":
@@ -36,6 +40,7 @@ def list_clients(
     else:
         stmt = select(Client).order_by(Client.id.desc())
 
+    stmt = stmt.where(Client.tenant_id == tenant_id)
     if q:
         s = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -51,8 +56,12 @@ def list_clients(
 
 
 @router.get("/{client_id}", response_model=ClientOut)
-def get_client(client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
-    c = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
+def get_client(request: Request, client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    c = db.execute(
+        select(Client).where(Client.id == client_id, Client.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if c is None:
         raise HTTPException(status_code=404, detail="client not found")
     return c
@@ -60,18 +69,32 @@ def get_client(client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
 
 @router.delete("/{client_id}", status_code=204)
 def delete_client(request: Request, client_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
-    c = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    c = db.execute(
+        select(Client).where(Client.id == client_id, Client.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if c is None:
         raise HTTPException(status_code=404, detail="client not found")
     name = c.name
     db.delete(c)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "client.deleted", "client", client_id, name)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "client.deleted",
+        "client",
+        client_id,
+        name,
+        tenant_id=tenant_id,
+    )
 
 
 @router.post("", response_model=ClientOut)
 def create_client(payload: ClientCreate, request: Request, db: Session = Depends(get_db)):
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="name must not be empty")
@@ -95,7 +118,9 @@ def create_client(payload: ClientCreate, request: Request, db: Session = Depends
         conditions.append(Client.telegram == telegram)
 
     if conditions:
-        exists = db.execute(select(Client.id).where(or_(*conditions))).scalar_one_or_none()
+        exists = db.execute(
+            select(Client.id).where(Client.tenant_id == tenant_id, or_(*conditions))
+        ).scalar_one_or_none()
         if exists is not None:
             raise HTTPException(
                 status_code=409,
@@ -103,6 +128,7 @@ def create_client(payload: ClientCreate, request: Request, db: Session = Depends
             )
 
     c = Client(
+        tenant_id=tenant_id,
         name=name,
         phone=phone,
         telegram=telegram,
@@ -119,5 +145,13 @@ def create_client(payload: ClientCreate, request: Request, db: Session = Depends
         )
     db.refresh(c)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "client.created", "client", c.id, f"{c.name}")
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "client.created",
+        "client",
+        c.id,
+        f"{c.name}",
+        tenant_id=tenant_id,
+    )
     return c

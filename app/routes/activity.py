@@ -30,7 +30,12 @@ def list_activity(
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
-    stmt = select(ActivityLog).order_by(ActivityLog.id.desc())
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    stmt = (
+        select(ActivityLog)
+        .where(ActivityLog.tenant_id == tenant_id)
+        .order_by(ActivityLog.id.desc())
+    )
     if user_id is not None:
         stmt = stmt.where(ActivityLog.user_id == user_id)
     if entity_type:
@@ -58,7 +63,12 @@ def ui_activity(
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
-    stmt = select(ActivityLog).order_by(ActivityLog.id.desc())
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    stmt = (
+        select(ActivityLog)
+        .where(ActivityLog.tenant_id == tenant_id)
+        .order_by(ActivityLog.id.desc())
+    )
     if user_id:
         stmt = stmt.where(ActivityLog.user_id == user_id)
     if entity_type:
