@@ -32,17 +32,7 @@ def _read_csv(upload: UploadFile) -> list[dict]:
     return rows
 
 
-@router.post("/clients")
-def import_clients(
-    request: Request,
-    file: UploadFile = File(...),
-    dry_run: bool = Query(False),
-    db: Session = Depends(get_db),
-):
-    rows = _read_csv(file)
-    if not rows:
-        return {"created": 0}
-
+def _process_clients(rows: list[dict], db: Session) -> tuple[int, list[str]]:
     required = {"name"}
     errors: list[str] = []
     created = 0
@@ -66,34 +56,10 @@ def import_clients(
             continue
         db.add(Client(name=name, phone=phone, telegram=telegram, notes=notes))
         created += 1
-
-    if errors:
-        db.rollback()
-        raise HTTPException(status_code=422, detail=errors)
-
-    if dry_run:
-        db.rollback()
-        return {"created": created, "dry_run": True}
-
-    db.commit()
-    user = getattr(request.state, "user", None)
-    if user:
-        for _ in range(created):
-            log_activity(db, getattr(user, "id", None), "client.created", "client", None, "CSV import")
-    return {"created": created}
+    return created, errors
 
 
-@router.post("/orders")
-def import_orders(
-    request: Request,
-    file: UploadFile = File(...),
-    dry_run: bool = Query(False),
-    db: Session = Depends(get_db),
-):
-    rows = _read_csv(file)
-    if not rows:
-        return {"created": 0}
-
+def _process_orders(rows: list[dict], db: Session) -> tuple[int, list[str]]:
     required = {"client_id", "title", "price"}
     allowed_statuses = {"new", "in_progress", "done", "canceled"}
     errors: list[str] = []
@@ -136,6 +102,50 @@ def import_orders(
             continue
         db.add(Order(client_id=client_id, title=title, price=price, status=status, comment=comment))
         created += 1
+    return created, errors
+
+
+@router.post("/clients")
+def import_clients(
+    request: Request,
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    rows = _read_csv(file)
+    if not rows:
+        return {"created": 0}
+
+    created, errors = _process_clients(rows, db)
+
+    if errors:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=errors)
+
+    if dry_run:
+        db.rollback()
+        return {"created": created, "dry_run": True}
+
+    db.commit()
+    user = getattr(request.state, "user", None)
+    if user:
+        for _ in range(created):
+            log_activity(db, getattr(user, "id", None), "client.created", "client", None, "CSV import")
+    return {"created": created}
+
+
+@router.post("/orders")
+def import_orders(
+    request: Request,
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    rows = _read_csv(file)
+    if not rows:
+        return {"created": 0}
+
+    created, errors = _process_orders(rows, db)
 
     if errors:
         db.rollback()

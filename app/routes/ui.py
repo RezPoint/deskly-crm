@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, or_
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +17,7 @@ from ..db import get_db
 from ..models import Client, Order, Payment, ActivityLog, Reminder
 from ..activity import log_activity
 from ..validators import validate_phone, validate_telegram
+from .imports import _read_csv, _process_clients, _process_orders
 
 router = APIRouter(prefix="/ui", tags=["ui"])
 
@@ -879,6 +880,91 @@ def ui_reminders(
             "total_pages": total_pages,
             "open_count": open_count,
             "overdue_count": overdue_count,
+        },
+    )
+
+
+@router.get("/import")
+def ui_import(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "import.html",
+        {
+            "request": request,
+            "client_result": None,
+            "order_result": None,
+            "client_errors": [],
+            "order_errors": [],
+            "client_preview": [],
+            "order_preview": [],
+        },
+    )
+
+
+@router.post("/import/clients")
+def ui_import_clients(
+    request: Request,
+    file: UploadFile = File(...),
+    dry_run: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    rows = _read_csv(file)
+    created, errors = _process_clients(rows, db)
+    if errors:
+        db.rollback()
+    elif dry_run == "1":
+        db.rollback()
+    else:
+        db.commit()
+        user = getattr(request.state, "user", None)
+        if user:
+            for _ in range(created):
+                log_activity(db, getattr(user, "id", None), "client.created", "client", None, "CSV import")
+    return templates.TemplateResponse(
+        request,
+        "import.html",
+        {
+            "request": request,
+            "client_result": {"created": created, "dry_run": dry_run == "1"},
+            "order_result": None,
+            "client_errors": errors,
+            "order_errors": [],
+            "client_preview": rows[:10],
+            "order_preview": [],
+        },
+    )
+
+
+@router.post("/import/orders")
+def ui_import_orders(
+    request: Request,
+    file: UploadFile = File(...),
+    dry_run: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    rows = _read_csv(file)
+    created, errors = _process_orders(rows, db)
+    if errors:
+        db.rollback()
+    elif dry_run == "1":
+        db.rollback()
+    else:
+        db.commit()
+        user = getattr(request.state, "user", None)
+        if user:
+            for _ in range(created):
+                log_activity(db, getattr(user, "id", None), "order.created", "order", None, "CSV import")
+    return templates.TemplateResponse(
+        request,
+        "import.html",
+        {
+            "request": request,
+            "client_result": None,
+            "order_result": {"created": created, "dry_run": dry_run == "1"},
+            "client_errors": [],
+            "order_errors": errors,
+            "client_preview": [],
+            "order_preview": rows[:10],
         },
     )
     
