@@ -62,3 +62,23 @@ def test_ui_reminders_pagination(client):
     r = client.get("/ui/reminders", params={"page": 1, "page_size": 2})
     assert r.status_code == 200
     assert "Page 1 / 2" in r.text
+
+
+def test_ui_reminders_today_and_bulk_done(client):
+    past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    today = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    r = client.post("/api/reminders", json={"title": "Past", "due_at": past})
+    assert r.status_code == 200
+    r = client.post("/api/reminders", json={"title": "Today", "due_at": today})
+    assert r.status_code == 200
+
+    r = client.get("/ui/reminders", params={"today": "1"})
+    assert r.status_code == 200
+    assert "Today" in r.text
+
+    r = client.post("/api/reminders/ui/mark-all-done", data={"scope": "overdue"}, follow_redirects=False)
+    assert r.status_code in {302, 303}
+
+    r = client.get("/api/reminders", params={"status": "open"})
+    assert r.status_code == 200
+    assert any(rem["title"] == "Today" for rem in r.json())
