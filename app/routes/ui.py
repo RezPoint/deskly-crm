@@ -761,15 +761,30 @@ def ui_update_order_price(
 def ui_activity(
     request: Request,
     limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    logs = db.execute(
-        select(ActivityLog).order_by(ActivityLog.id.desc()).limit(limit)
-    ).scalars().all()
+    stmt = select(ActivityLog).order_by(ActivityLog.id.desc())
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    logs = db.execute(stmt.limit(limit).offset(offset)).scalars().all()
+    page = (offset // limit) + 1
+    total_pages = max(1, (total + limit - 1) // limit)
     return templates.TemplateResponse(
         request,
         "activity.html",
-        {"request": request, "logs": logs},
+        {
+            "request": request,
+            "logs": logs,
+            "filter_user_id": "",
+            "filter_entity_type": "",
+            "filter_action": "",
+            "filter_date_from": "",
+            "filter_date_to": "",
+            "page": page,
+            "total_pages": total_pages,
+            "limit": limit,
+            "offset": offset,
+        },
     )
 
 
