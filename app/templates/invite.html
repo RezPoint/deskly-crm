@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% set title = "Accept invite -- DesklyCRM" %}
+
+{% block content %}
+<h1>Accept invite</h1>
+
+{% if error %}
+  <p class="err">{{ error }}</p>
+{% endif %}
+
+{% if invite %}
+  <div class="card">
+    <h3>Invite for {{ invite.email }}</h3>
+    <p class="muted">Role: {{ invite.role }}</p>
+    <form method="post" action="/invite" class="row">
+      <input type="hidden" name="token" value="{{ token }}" />
+      <input name="password" type="password" placeholder="Set password (min 6 chars)" required />
+      <button type="submit">Create account</button>
+    </form>
+  </div>
+{% else %}
+  <p class="muted">Invite link is invalid or expired.</p>
+{% endif %}
+{% endblock %}

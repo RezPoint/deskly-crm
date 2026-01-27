@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import create_app
-from app.models import User
+from app.models import User, Tenant
 from app.security import hash_password
 
 
@@ -13,7 +13,11 @@ def client(tmp_path):
     with TestClient(app) as c:
         db = app.state.SessionLocal()
         try:
+            tenant = Tenant(name="Default", slug="default")
+            db.add(tenant)
+            db.flush()
             user = User(email="owner@example.com", password_hash=hash_password("secret123"), role="owner")
+            user.tenant_id = tenant.id
             db.add(user)
             db.commit()
         finally:

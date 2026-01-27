@@ -1,11 +1,15 @@
-from app.models import User
+from sqlalchemy import select
+
+from app.models import User, Tenant
 from app.security import hash_password
 
 
 def test_viewer_cannot_write(client):
     db = client.app.state.SessionLocal()
     try:
+        tenant = db.execute(select(Tenant)).scalar_one()
         viewer = User(email="viewer@example.com", password_hash=hash_password("viewer123"), role="viewer")
+        viewer.tenant_id = tenant.id
         db.add(viewer)
         db.commit()
     finally:
@@ -21,7 +25,9 @@ def test_viewer_cannot_write(client):
 def test_admin_can_manage_users_but_not_roles(client):
     db = client.app.state.SessionLocal()
     try:
+        tenant = db.execute(select(Tenant)).scalar_one()
         admin = User(email="admin@example.com", password_hash=hash_password("admin123"), role="admin")
+        admin.tenant_id = tenant.id
         db.add(admin)
         db.commit()
     finally:
