@@ -27,6 +27,14 @@
 ### Fixed
 - Unified UI error styling and empty states.
 
+## [0.3.0] - 2026-01-27
+### Added
+- Tenants table and workspace setup flow.
+- Tenant UI page and API endpoint.
+
+### Fixed
+- Postgres alembic version length for long revision IDs.
+
 ## [0.2.8] - 2026-01-27
 ### Added
 - Tenant scoping fields across core entities (clients, orders, payments, reminders, users, activity).

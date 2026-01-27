@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import User
+from ..models import User, Tenant
 from ..security import create_access_token, hash_password, verify_password
 from ..auth import get_current_user, require_role
 from ..validators import validate_email
@@ -17,6 +17,23 @@ from .ui import templates
 
 
 router = APIRouter(tags=["auth"])
+
+
+def _slugify(value: str) -> str:
+    value = (value or "").strip().lower()
+    value = value.replace(" ", "-")
+    cleaned = "".join(ch for ch in value if ch.isalnum() or ch == "-")
+    cleaned = cleaned.strip("-")
+    return cleaned or "default"
+
+
+def _unique_slug(db: Session, base: str) -> str:
+    slug = base
+    counter = 1
+    while db.execute(select(Tenant.id).where(Tenant.slug == slug)).first():
+        slug = f"{base}-{counter}"
+        counter += 1
+    return slug
 
 
 def _get_user_by_email(db: Session, email: str, tenant_id: Optional[int] = None) -> Optional[User]:
@@ -37,7 +54,7 @@ def setup_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request,
         "setup.html",
-        {"request": request, "error": "", "email": ""},
+        {"request": request, "error": "", "email": "", "workspace": ""},
     )
 
 
@@ -46,6 +63,7 @@ def setup_submit(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    workspace: str = Form(""),
     db: Session = Depends(get_db),
 ):
     if _has_users(db):
@@ -59,18 +77,35 @@ def setup_submit(
         return templates.TemplateResponse(
             request,
             "setup.html",
-            {"request": request, "error": "Valid email is required", "email": email},
+            {"request": request, "error": "Valid email is required", "email": email, "workspace": workspace},
             status_code=422,
         )
     if len(password) < 6:
         return templates.TemplateResponse(
             request,
             "setup.html",
-            {"request": request, "error": "Password must be at least 6 characters", "email": email},
+            {
+                "request": request,
+                "error": "Password must be at least 6 characters",
+                "email": email,
+                "workspace": workspace,
+            },
             status_code=422,
         )
 
-    user = User(email=email, password_hash=hash_password(password), role="owner")
+    workspace_name = (workspace or "").strip() or "Default"
+    slug_base = _slugify(workspace_name)
+    slug = _unique_slug(db, slug_base)
+    tenant = Tenant(name=workspace_name, slug=slug)
+    db.add(tenant)
+    db.flush()
+
+    user = User(
+        email=email,
+        password_hash=hash_password(password),
+        role="owner",
+        tenant_id=tenant.id,
+    )
     db.add(user)
     db.commit()
     return RedirectResponse(url="/login", status_code=303)

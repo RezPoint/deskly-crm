@@ -6,7 +6,7 @@ from fastapi import HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import User
+from .models import User, Tenant
 from .security import decode_access_token
 
 
@@ -45,6 +45,8 @@ def get_current_user(request: Request, db: Session) -> User:
     if user is None:
         raise HTTPException(status_code=401, detail="invalid token")
     request.state.user = user
+    tenant = db.execute(select(Tenant).where(Tenant.id == user.tenant_id)).scalar_one_or_none()
+    request.state.tenant = tenant
     return user
 
 

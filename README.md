@@ -111,20 +111,14 @@ API endpoints:
   - Columns: `name` (required), `phone`, `telegram`, `notes`
 - `POST /api/import/orders` (multipart file `file`)
   - Columns: `client_id` (required), `title` (required), `price` (required), `status` (optional), `comment`
- HEAD
- origin/main
 Optional query params:
 - `dry_run=true` to validate without saving
 
 CSV templates:
 - `GET /api/export/templates/clients.csv`
 - `GET /api/export/templates/orders.csv`
- HEAD
-
-
 UI:
 - `/ui/import` upload CSV files with preview and dry-run
- origin/main
 
 ## Auth (0.2)
 - First run: open `/setup` to create the owner account.
@@ -178,6 +172,20 @@ deskly-crm/
 ## Contributing
 
 Issues and pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to add.
+
+See CONTRIBUTING.md for dev setup and PR guidelines.
+
+## Code of Conduct
+
+This project follows the Contributor Covenant Code of Conduct. See CODE_OF_CONDUCT.md.
+
+## Security
+
+Please report security issues privately. See SECURITY.md.
+
+## Support
+
+See SUPPORT.md for help and contact options.
 
 ## License
 

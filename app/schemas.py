@@ -103,6 +103,13 @@ class UserOut(APIModel):
     created_at: datetime
 
 
+class TenantOut(APIModel):
+    id: int
+    name: str
+    slug: str
+    created_at: datetime
+
+
 class LoginIn(APIModel):
     email: str
     password: str
