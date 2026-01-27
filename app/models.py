@@ -13,8 +13,8 @@ def utcnow():
 class Client(Base):
     __tablename__ = "clients"
     __table_args__ = (
-        UniqueConstraint("phone", name="uq_clients_phone"),
-        UniqueConstraint("telegram", name="uq_clients_telegram"),
+        UniqueConstraint("tenant_id", "phone", name="uq_clients_phone_tenant"),
+        UniqueConstraint("tenant_id", "telegram", name="uq_clients_telegram_tenant"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -60,7 +60,7 @@ class Payment(Base):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (UniqueConstraint("email", name="uq_users_email"),)
+    __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_users_email_tenant"),)
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, nullable=False, default=1, index=True)
