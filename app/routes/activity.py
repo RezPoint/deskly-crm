@@ -51,6 +51,8 @@ def ui_activity(
     user_id: Optional[int] = Query(None),
     entity_type: Optional[str] = Query(None),
     action: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
@@ -61,6 +63,10 @@ def ui_activity(
         stmt = stmt.where(ActivityLog.entity_type == entity_type)
     if action:
         stmt = stmt.where(ActivityLog.action == action)
+    if date_from:
+        stmt = stmt.where(ActivityLog.created_at >= date_from)
+    if date_to:
+        stmt = stmt.where(ActivityLog.created_at <= date_to)
     logs = db.execute(stmt.limit(limit)).scalars().all()
     return templates.TemplateResponse(
         request,
@@ -71,5 +77,7 @@ def ui_activity(
             "filter_user_id": user_id or "",
             "filter_entity_type": entity_type or "",
             "filter_action": action or "",
+            "filter_date_from": date_from or "",
+            "filter_date_to": date_to or "",
         },
     )

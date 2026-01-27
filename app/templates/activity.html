@@ -10,6 +10,8 @@
     <input name="user_id" placeholder="User ID" value="{{ filter_user_id }}" />
     <input name="entity_type" placeholder="Entity (client/order/payment/reminder)" value="{{ filter_entity_type }}" />
     <input name="action" placeholder="Action (e.g. order.created)" value="{{ filter_action }}" />
+    <input name="date_from" type="date" value="{{ filter_date_from }}" />
+    <input name="date_to" type="date" value="{{ filter_date_to }}" />
     <button type="submit">Apply</button>
   </form>
 </div>
