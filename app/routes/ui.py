@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from ..db import get_db
-from ..models import Client, Order, Payment, ActivityLog, Reminder
+from ..models import Client, Order, Payment, ActivityLog, Reminder, Tenant
 from ..activity import log_activity
 from ..validators import validate_phone, validate_telegram
 from .imports import _read_csv, _process_clients, _process_orders
@@ -56,6 +56,11 @@ templates.env.filters["dt"] = format_dt
 
 def _get_tenant_id(request: Request) -> int:
     return getattr(getattr(request.state, "user", None), "tenant_id", 1)
+
+
+def _get_tenant(request: Request, db: Session) -> Tenant | None:
+    tenant_id = _get_tenant_id(request)
+    return db.execute(select(Tenant).where(Tenant.id == tenant_id)).scalar_one_or_none()
 
 
 def _to_decimal(s: str, field_name: str) -> Decimal:
@@ -995,6 +1000,18 @@ def ui_activity(
             "limit": limit,
             "offset": offset,
         },
+    )
+
+
+@router.get("/tenant")
+def ui_tenant(request: Request, db: Session = Depends(get_db)):
+    tenant = _get_tenant(request, db)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="tenant not found")
+    return templates.TemplateResponse(
+        request,
+        "tenant.html",
+        {"request": request, "tenant": tenant},
     )
 @router.get("/reminders")
 def ui_reminders(

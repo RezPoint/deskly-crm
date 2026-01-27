@@ -25,6 +25,7 @@ from .routes.auth import router as auth_router
 from .routes.activity import router as activity_router
 from .routes.reminders import router as reminders_router
 from .routes.imports import router as imports_router
+from .routes.tenant import router as tenant_router
 from .auth import PUBLIC_PATHS, get_current_user, has_users
 
 
@@ -144,6 +145,7 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
     app.include_router(payments_router)
     app.include_router(export_router)
     app.include_router(imports_router)
+    app.include_router(tenant_router)
     app.include_router(activity_router)
     app.include_router(reminders_router)
 

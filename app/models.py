@@ -10,6 +10,17 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+class Tenant(Base):
+    __tablename__ = "tenants"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(120), nullable=False)
+    slug = Column(String(120), nullable=False, unique=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    users = relationship("User", back_populates="tenant")
+
+
 class Client(Base):
     __tablename__ = "clients"
     __table_args__ = (
@@ -63,11 +74,13 @@ class User(Base):
     __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_users_email_tenant"),)
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, nullable=False, default=1, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, default=1, index=True)
     email = Column(String(200), nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(30), nullable=False, default="owner")  # owner/admin/viewer
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    tenant = relationship("Tenant", back_populates="users")
 
 
 class ActivityLog(Base):
