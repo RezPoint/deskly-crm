@@ -111,6 +111,12 @@ API endpoints:
   - Columns: `name` (required), `phone`, `telegram`, `notes`
 - `POST /api/import/orders` (multipart file `file`)
   - Columns: `client_id` (required), `title` (required), `price` (required), `status` (optional), `comment`
+Optional query params:
+- `dry_run=true` to validate without saving
+
+CSV templates:
+- `GET /api/export/templates/clients.csv`
+- `GET /api/export/templates/orders.csv`
 
 ## Auth (0.2)
 - First run: open `/setup` to create the owner account.

@@ -23,3 +23,14 @@ def test_import_orders_invalid_client(client):
     csv = "client_id,title,price,status\n999,Order X,10,new\n"
     r = client.post("/api/import/orders", files=_csv_file(csv))
     assert r.status_code == 422
+
+
+def test_import_clients_dry_run(client):
+    csv = "name,phone,telegram,notes\nDry,+123,,note\n"
+    r = client.post("/api/import/clients?dry_run=true", files=_csv_file(csv))
+    assert r.status_code == 200
+    assert r.json()["dry_run"] is True
+
+    r = client.get("/api/clients", params={"q": "Dry"})
+    assert r.status_code == 200
+    assert all(c["name"] != "Dry" for c in r.json())
