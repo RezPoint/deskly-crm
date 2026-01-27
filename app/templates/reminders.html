@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+{% set title = "Reminders -- DesklyCRM" %}
+
+{% block content %}
+<h1>Reminders</h1>
+
+<div class="card">
+  <h3>Filters</h3>
+  <form method="get" action="/ui/reminders" class="row">
+    <select name="status">
+      <option value="">All</option>
+      <option value="open" {% if filter_status == "open" %}selected{% endif %}>open</option>
+      <option value="done" {% if filter_status == "done" %}selected{% endif %}>done</option>
+    </select>
+    <button type="submit">Apply</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>⏰ Add reminder</h3>
+  <form method="post" action="/api/reminders/ui" class="row">
+    <input name="title" placeholder="Title" required />
+    <input name="due_at" type="datetime-local" required />
+    <button type="submit">Create</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>📒 List</h3>
+  {% if reminders|length == 0 %}
+    <p class="muted">No reminders yet.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Due</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in reminders %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td>{{ r.title }}</td>
+          <td><span class="pill {{ r.status }}">{{ r.status }}</span></td>
+          <td class="muted">{{ r.due_at|dt }}</td>
+          <td class="actions">
+            {% if r.status != "done" %}
+              <form method="post" action="/api/reminders/ui/{{ r.id }}/done" class="inline">
+                <button type="submit" class="btn-ghost">Done</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}

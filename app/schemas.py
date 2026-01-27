@@ -116,3 +116,29 @@ class ActivityLogOut(APIModel):
     entity_id: Optional[int] = None
     message: Optional[str] = None
     created_at: datetime
+
+
+class ReminderStatus(str, Enum):
+    open = "open"
+    done = "done"
+
+
+class ReminderCreate(APIModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    due_at: datetime
+    entity_type: Optional[str] = None
+    entity_id: Optional[int] = None
+
+
+class ReminderUpdate(APIModel):
+    status: ReminderStatus
+
+
+class ReminderOut(APIModel):
+    id: int
+    title: str
+    due_at: datetime
+    status: ReminderStatus
+    entity_type: Optional[str] = None
+    entity_id: Optional[int] = None
+    created_at: datetime
