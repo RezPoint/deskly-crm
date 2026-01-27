@@ -20,3 +20,12 @@ def test_activity_log_filters(client):
     r = client.get("/api/activity", params={"entity_type": "client", "action": "client.created"})
     assert r.status_code == 200
     assert any(l["entity_id"] == client_id for l in r.json())
+
+
+def test_activity_pagination(client):
+    for i in range(3):
+        client.post("/api/clients", json={"name": f"Paginate {i}"})
+
+    r = client.get("/api/activity", params={"limit": 2, "offset": 0})
+    assert r.status_code == 200
+    assert len(r.json()) == 2

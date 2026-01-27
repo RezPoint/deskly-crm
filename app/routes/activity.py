@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/activity", tags=["activity"])
 def list_activity(
     request: Request,
     limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     user_id: Optional[int] = Query(None, ge=1),
     entity_type: Optional[str] = Query(None),
     action: Optional[str] = Query(None),
@@ -40,7 +41,7 @@ def list_activity(
         stmt = stmt.where(ActivityLog.created_at >= date_from)
     if date_to:
         stmt = stmt.where(ActivityLog.created_at <= date_to)
-    stmt = stmt.limit(limit)
+    stmt = stmt.limit(limit).offset(offset)
     return db.execute(stmt).scalars().all()
 
 
@@ -48,6 +49,7 @@ def list_activity(
 def ui_activity(
     request: Request,
     limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     user_id: Optional[int] = Query(None),
     entity_type: Optional[str] = Query(None),
     action: Optional[str] = Query(None),
@@ -67,7 +69,10 @@ def ui_activity(
         stmt = stmt.where(ActivityLog.created_at >= date_from)
     if date_to:
         stmt = stmt.where(ActivityLog.created_at <= date_to)
-    logs = db.execute(stmt.limit(limit)).scalars().all()
+    total_count = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    logs = db.execute(stmt.limit(limit).offset(offset)).scalars().all()
+    page = (offset // limit) + 1
+    total_pages = max(1, (total_count + limit - 1) // limit)
     return templates.TemplateResponse(
         request,
         "activity.html",
@@ -79,5 +84,9 @@ def ui_activity(
             "filter_action": action or "",
             "filter_date_from": date_from or "",
             "filter_date_to": date_to or "",
+            "page": page,
+            "total_pages": total_pages,
+            "limit": limit,
+            "offset": offset,
         },
     )
