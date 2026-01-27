@@ -19,6 +19,9 @@ def upgrade():
     bind = op.get_bind()
     inspector = sa.inspect(bind)
 
+    if bind.dialect.name != "sqlite":
+        op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)")
+
     client_uniques = {c["name"] for c in inspector.get_unique_constraints("clients")}
     user_uniques = {c["name"] for c in inspector.get_unique_constraints("users")}
 
