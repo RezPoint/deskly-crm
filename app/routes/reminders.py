@@ -179,3 +179,17 @@ def ui_mark_done(reminder_id: int, request: Request, db: Session = Depends(get_d
     user = getattr(request.state, "user", None)
     log_activity(db, getattr(user, "id", None), "reminder.status_updated", "reminder", r.id, "done")
     return RedirectResponse(url="/ui/reminders", status_code=303)
+
+
+@router.post("/ui/{reminder_id}/delete", response_class=RedirectResponse)
+def ui_delete_reminder(reminder_id: int, request: Request, db: Session = Depends(get_db)):
+    get_current_user(request, db)
+    r = db.execute(select(Reminder).where(Reminder.id == reminder_id)).scalar_one_or_none()
+    if r is None:
+        raise HTTPException(status_code=404, detail="reminder not found")
+    title = r.title
+    db.delete(r)
+    db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "reminder.deleted", "reminder", reminder_id, title)
+    return RedirectResponse(url="/ui/reminders", status_code=303)

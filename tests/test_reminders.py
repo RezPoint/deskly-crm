@@ -15,6 +15,9 @@ def test_reminder_crud(client):
     assert r.status_code == 200
     assert r.json()["status"] == "done"
 
+    r = client.delete(f"/api/reminders/{reminder_id}")
+    assert r.status_code == 204
+
 
 def test_reminder_overdue_filter(client):
     past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()

@@ -29,13 +29,17 @@
 
 <div class="card">
   <h3>Add reminder</h3>
-  <form method="post" action="/api/reminders/ui" class="row">
-    <input name="title" placeholder="Title" required />
-    <input name="due_at" type="datetime-local" required />
-    <input name="entity_type" placeholder="Entity (order/client)" />
-    <input name="entity_id" placeholder="Entity ID" />
-    <button type="submit">Create</button>
-  </form>
+  {% if request.state.user and request.state.user.role != "viewer" %}
+    <form method="post" action="/api/reminders/ui" class="row">
+      <input name="title" placeholder="Title" required />
+      <input name="due_at" type="datetime-local" required />
+      <input name="entity_type" placeholder="Entity (order/client)" />
+      <input name="entity_id" placeholder="Entity ID" />
+      <button type="submit">Create</button>
+    </form>
+  {% else %}
+    <p class="muted">Viewer role cannot create reminders.</p>
+  {% endif %}
 </div>
 
 <div class="card">
@@ -69,9 +73,14 @@
             {% endif %}
           </td>
           <td class="actions">
-            {% if r.status != "done" %}
-              <form method="post" action="/api/reminders/ui/{{ r.id }}/done" class="inline">
-                <button type="submit" class="btn-ghost">Done</button>
+            {% if request.state.user and request.state.user.role != "viewer" %}
+              {% if r.status != "done" %}
+                <form method="post" action="/api/reminders/ui/{{ r.id }}/done" class="inline">
+                  <button type="submit" class="btn-ghost">Done</button>
+                </form>
+              {% endif %}
+              <form method="post" action="/api/reminders/ui/{{ r.id }}/delete" class="inline" data-confirm="Delete reminder?">
+                <button type="submit" class="danger">Delete</button>
               </form>
             {% endif %}
           </td>
