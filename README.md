@@ -61,6 +61,10 @@ Health: http://127.0.0.1:8000/health
 Metrics: http://127.0.0.1:8000/metrics
 UI: http://127.0.0.1:8000/ui/clients
 
+### Docker workflow
+- Code changes only: `docker compose restart web`
+- Dependency/Dockerfile changes: `docker compose up -d --build`
+
 ## PostgreSQL (Local)
 Set `DATABASE_URL` to use Postgres:
 
