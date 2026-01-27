@@ -29,8 +29,8 @@
   <h3>Add client</h3>
   <form method="post" action="/ui/clients" class="row">
     <input name="name" placeholder="Name *" value="{{ form_name }}" required />
-    <input name="phone" placeholder="Phone" value="{{ form_phone }}" />
-    <input name="telegram" placeholder="Telegram" value="{{ form_telegram }}" />
+    <input name="phone" placeholder="Phone (+7 999 000-00-00)" value="{{ form_phone }}" type="tel" pattern="^[+\\d\\s()\\-]{3,25}$" title="Digits, spaces, +, -, parentheses (3-25 chars)" />
+    <input name="telegram" placeholder="Telegram (@username)" value="{{ form_telegram }}" pattern="^@?[A-Za-z0-9_]{5,32}$" title="5-32 chars: letters, numbers, underscore" />
     <input name="notes" placeholder="Notes" value="{{ form_notes }}" />
     <button type="submit">Create</button>
   </form>

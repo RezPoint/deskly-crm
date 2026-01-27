@@ -52,14 +52,14 @@
       {% endfor %}
     </select>
     <input name="title" placeholder="Title *" value="{{ create_title }}" required />
-    <input name="price" placeholder="Price (e.g. 15000 or 15000.00)" value="{{ create_price }}" />
+    <input name="price" placeholder="Price (e.g. 15000 or 15000.00)" value="{{ create_price }}" type="number" min="0" step="0.01" />
     <select name="status">
       <option value="new" {% if create_status == "new" %}selected{% endif %}>new</option>
       <option value="in_progress" {% if create_status == "in_progress" %}selected{% endif %}>in_progress</option>
       <option value="done" {% if create_status == "done" %}selected{% endif %}>done</option>
       <option value="canceled" {% if create_status == "canceled" %}selected{% endif %}>canceled</option>
     </select>
-    <input name="comment" placeholder="Comment" value="{{ create_comment }}" />
+    <input name="comment" placeholder="Comment" value="{{ create_comment }}" maxlength="500" />
     <button type="submit">Create</button>
   </form>
 </div>
