@@ -19,8 +19,11 @@ from .ui import templates
 router = APIRouter(tags=["auth"])
 
 
-def _get_user_by_email(db: Session, email: str) -> Optional[User]:
-    return db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+def _get_user_by_email(db: Session, email: str, tenant_id: Optional[int] = None) -> Optional[User]:
+    stmt = select(User).where(User.email == email)
+    if tenant_id is not None:
+        stmt = stmt.where(User.tenant_id == tenant_id)
+    return db.execute(stmt).scalar_one_or_none()
 
 
 def _has_users(db: Session) -> bool:
@@ -132,7 +135,12 @@ def api_login(payload: dict, db: Session = Depends(get_db)):
 def api_list_users(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     require_role(user, {"owner", "admin"})
-    users = db.execute(select(User).order_by(User.id.asc())).scalars().all()
+    tenant_id = getattr(user, "tenant_id", 1)
+    users = (
+        db.execute(select(User).where(User.tenant_id == tenant_id).order_by(User.id.asc()))
+        .scalars()
+        .all()
+    )
     return [{"id": u.id, "email": u.email, "role": u.role, "created_at": u.created_at} for u in users]
 
 
@@ -140,6 +148,7 @@ def api_list_users(request: Request, db: Session = Depends(get_db)):
 def api_create_user(request: Request, payload: dict, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     require_role(user, {"owner", "admin"})
+    tenant_id = getattr(user, "tenant_id", 1)
     try:
         email = validate_email(payload.get("email"))
     except ValueError:
@@ -152,9 +161,9 @@ def api_create_user(request: Request, payload: dict, db: Session = Depends(get_d
         raise HTTPException(status_code=422, detail="password must be at least 6 chars")
     if role not in {"owner", "admin", "viewer"}:
         raise HTTPException(status_code=422, detail="invalid role")
-    if _get_user_by_email(db, email):
+    if _get_user_by_email(db, email, tenant_id=tenant_id):
         raise HTTPException(status_code=409, detail="user already exists")
-    new_user = User(email=email, password_hash=hash_password(password), role=role)
+    new_user = User(email=email, password_hash=hash_password(password), role=role, tenant_id=tenant_id)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -165,10 +174,13 @@ def api_create_user(request: Request, payload: dict, db: Session = Depends(get_d
 def api_update_role(user_id: int, request: Request, payload: dict, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     require_role(user, {"owner"})
+    tenant_id = getattr(user, "tenant_id", 1)
     role = (payload.get("role") or "").strip()
     if role not in {"owner", "admin", "viewer"}:
         raise HTTPException(status_code=422, detail="invalid role")
-    target = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    target = db.execute(
+        select(User).where(User.id == user_id, User.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if target is None:
         raise HTTPException(status_code=404, detail="user not found")
     target.role = role
@@ -180,10 +192,13 @@ def api_update_role(user_id: int, request: Request, payload: dict, db: Session =
 def api_reset_password(user_id: int, request: Request, payload: dict, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     require_role(user, {"owner", "admin"})
+    tenant_id = getattr(user, "tenant_id", 1)
     password = payload.get("password") or ""
     if len(password) < 6:
         raise HTTPException(status_code=422, detail="password must be at least 6 chars")
-    target = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    target = db.execute(
+        select(User).where(User.id == user_id, User.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if target is None:
         raise HTTPException(status_code=404, detail="user not found")
     target.password_hash = hash_password(password)
@@ -197,7 +212,12 @@ def ui_users(request: Request, db: Session = Depends(get_db)):
     if user.role == "viewer":
         return RedirectResponse(url="/ui/clients", status_code=303)
     require_role(user, {"owner", "admin"})
-    users = db.execute(select(User).order_by(User.id.asc())).scalars().all()
+    tenant_id = getattr(user, "tenant_id", 1)
+    users = (
+        db.execute(select(User).where(User.tenant_id == tenant_id).order_by(User.id.asc()))
+        .scalars()
+        .all()
+    )
     return templates.TemplateResponse(
         request,
         "users.html",
@@ -215,6 +235,7 @@ def ui_create_user(
 ):
     user = get_current_user(request, db)
     require_role(user, {"owner", "admin"})
+    tenant_id = getattr(user, "tenant_id", 1)
     try:
         email = validate_email(email)
     except ValueError:
@@ -223,31 +244,47 @@ def ui_create_user(
         return templates.TemplateResponse(
             request,
             "users.html",
-            {"request": request, "users": db.execute(select(User)).scalars().all(), "error": "Valid email required"},
+            {
+                "request": request,
+                "users": db.execute(select(User).where(User.tenant_id == tenant_id)).scalars().all(),
+                "error": "Valid email required",
+            },
             status_code=422,
         )
     if len(password) < 6:
         return templates.TemplateResponse(
             request,
             "users.html",
-            {"request": request, "users": db.execute(select(User)).scalars().all(), "error": "Password too short"},
+            {
+                "request": request,
+                "users": db.execute(select(User).where(User.tenant_id == tenant_id)).scalars().all(),
+                "error": "Password too short",
+            },
             status_code=422,
         )
     if role not in {"owner", "admin", "viewer"}:
         return templates.TemplateResponse(
             request,
             "users.html",
-            {"request": request, "users": db.execute(select(User)).scalars().all(), "error": "Invalid role"},
+            {
+                "request": request,
+                "users": db.execute(select(User).where(User.tenant_id == tenant_id)).scalars().all(),
+                "error": "Invalid role",
+            },
             status_code=422,
         )
-    if _get_user_by_email(db, email):
+    if _get_user_by_email(db, email, tenant_id=tenant_id):
         return templates.TemplateResponse(
             request,
             "users.html",
-            {"request": request, "users": db.execute(select(User)).scalars().all(), "error": "User already exists"},
+            {
+                "request": request,
+                "users": db.execute(select(User).where(User.tenant_id == tenant_id)).scalars().all(),
+                "error": "User already exists",
+            },
             status_code=409,
         )
-    new_user = User(email=email, password_hash=hash_password(password), role=role)
+    new_user = User(email=email, password_hash=hash_password(password), role=role, tenant_id=tenant_id)
     db.add(new_user)
     db.commit()
     return RedirectResponse(url="/ui/users", status_code=303)
@@ -262,7 +299,10 @@ def ui_update_role(
 ):
     user = get_current_user(request, db)
     require_role(user, {"owner"})
-    target = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    tenant_id = getattr(user, "tenant_id", 1)
+    target = db.execute(
+        select(User).where(User.id == user_id, User.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if target is None:
         raise HTTPException(status_code=404, detail="user not found")
     if role not in {"owner", "admin", "viewer"}:
@@ -281,14 +321,21 @@ def ui_reset_password(
 ):
     user = get_current_user(request, db)
     require_role(user, {"owner", "admin"})
+    tenant_id = getattr(user, "tenant_id", 1)
     if len(password) < 6:
         return templates.TemplateResponse(
             request,
             "users.html",
-            {"request": request, "users": db.execute(select(User)).scalars().all(), "error": "Password too short"},
+            {
+                "request": request,
+                "users": db.execute(select(User).where(User.tenant_id == tenant_id)).scalars().all(),
+                "error": "Password too short",
+            },
             status_code=422,
         )
-    target = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    target = db.execute(
+        select(User).where(User.id == user_id, User.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if target is None:
         raise HTTPException(status_code=404, detail="user not found")
     target.password_hash = hash_password(password)

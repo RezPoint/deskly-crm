@@ -27,6 +27,13 @@
 ### Fixed
 - Unified UI error styling and empty states.
 
+## [0.2.8] - 2026-01-27
+### Added
+- Tenant scoping fields across core entities (clients, orders, payments, reminders, users, activity).
+
+### Fixed
+- Tenant filtering for UI/API lists, exports, and imports.
+
 ## [0.1.6] - 2026-01-26
 ### Added
 - Indexes for filters and search (clients name, orders status/created_at/title/comment).

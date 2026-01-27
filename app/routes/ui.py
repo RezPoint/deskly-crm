@@ -54,6 +54,10 @@ def format_dt(v) -> str:
 templates.env.filters["dt"] = format_dt
 
 
+def _get_tenant_id(request: Request) -> int:
+    return getattr(getattr(request.state, "user", None), "tenant_id", 1)
+
+
 def _to_decimal(s: str, field_name: str) -> Decimal:
     try:
         d = Decimal(s.replace(",", ".")).quantize(Decimal("0.01"))
@@ -101,7 +105,14 @@ def _render_orders(
     error: str = "",
     status_code: int = 200,
 ):
-    clients = db.execute(select(Client).order_by(Client.name.asc())).scalars().all()
+    tenant_id = _get_tenant_id(request)
+    clients = (
+        db.execute(
+            select(Client).where(Client.tenant_id == tenant_id).order_by(Client.name.asc())
+        )
+        .scalars()
+        .all()
+    )
 
     if sort == "created_asc":
         stmt = select(Order).order_by(Order.id.asc())
@@ -111,6 +122,7 @@ def _render_orders(
         stmt = select(Order).order_by(Order.price.asc(), Order.id.asc())
     else:
         stmt = select(Order).order_by(Order.id.desc())
+    stmt = stmt.where(Order.tenant_id == tenant_id)
     if client_id:
         stmt = stmt.where(Order.client_id == client_id)
     if status:
@@ -140,7 +152,7 @@ def _render_orders(
     if order_ids:
         rows = db.execute(
             select(Payment.order_id, func.coalesce(func.sum(Payment.amount), 0))
-            .where(Payment.order_id.in_(order_ids))
+            .where(Payment.order_id.in_(order_ids), Payment.tenant_id == tenant_id)
             .group_by(Payment.order_id)
         ).all()
         paid_map = {order_id: _as_decimal(paid) for order_id, paid in rows}
@@ -210,6 +222,7 @@ def ui_clients(
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
+    tenant_id = _get_tenant_id(request)
     if sort == "created_asc":
         stmt = select(Client).order_by(Client.id.asc())
     elif sort == "name_asc":
@@ -218,6 +231,7 @@ def ui_clients(
         stmt = select(Client).order_by(Client.name.desc())
     else:
         stmt = select(Client).order_by(Client.id.desc())
+    stmt = stmt.where(Client.tenant_id == tenant_id)
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -261,6 +275,7 @@ def ui_create_client(
     notes: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
+    tenant_id = _get_tenant_id(request)
     name_clean = (name or "").strip()
     if not name_clean:
         return templates.TemplateResponse(
@@ -268,7 +283,13 @@ def ui_create_client(
             "clients.html",
             {
                 "request": request,
-                "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
+                "clients": db.execute(
+                    select(Client)
+                    .where(Client.tenant_id == tenant_id)
+                    .order_by(Client.id.desc())
+                )
+                .scalars()
+                .all(),
                 "q": "",
                 "filter_sort": "created_desc",
                 "page": 1,
@@ -296,7 +317,13 @@ def ui_create_client(
             "clients.html",
             {
                 "request": request,
-                "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
+                "clients": db.execute(
+                    select(Client)
+                    .where(Client.tenant_id == tenant_id)
+                    .order_by(Client.id.desc())
+                )
+                .scalars()
+                .all(),
                 "q": "",
                 "filter_sort": "created_desc",
                 "page": 1,
@@ -319,14 +346,22 @@ def ui_create_client(
         conditions.append(Client.telegram == telegram_clean)
 
     if conditions:
-        exists = db.execute(select(Client.id).where(or_(*conditions))).scalar_one_or_none()
+        exists = db.execute(
+            select(Client.id).where(Client.tenant_id == tenant_id, or_(*conditions))
+        ).scalar_one_or_none()
         if exists is not None:
             return templates.TemplateResponse(
                 request,
                 "clients.html",
                 {
                     "request": request,
-                    "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
+                    "clients": db.execute(
+                        select(Client)
+                        .where(Client.tenant_id == tenant_id)
+                        .order_by(Client.id.desc())
+                    )
+                    .scalars()
+                    .all(),
                     "q": "",
                     "filter_sort": "created_desc",
                     "page": 1,
@@ -341,7 +376,13 @@ def ui_create_client(
                 status_code=409,
             )
 
-    c = Client(name=name_clean, phone=phone_clean, telegram=telegram_clean, notes=notes_clean)
+    c = Client(
+        tenant_id=tenant_id,
+        name=name_clean,
+        phone=phone_clean,
+        telegram=telegram_clean,
+        notes=notes_clean,
+    )
     db.add(c)
     try:
         db.commit()
@@ -352,7 +393,13 @@ def ui_create_client(
             "clients.html",
             {
                 "request": request,
-                "clients": db.execute(select(Client).order_by(Client.id.desc())).scalars().all(),
+                "clients": db.execute(
+                    select(Client)
+                    .where(Client.tenant_id == tenant_id)
+                    .order_by(Client.id.desc())
+                )
+                .scalars()
+                .all(),
                 "q": "",
                 "filter_sort": "created_desc",
                 "page": 1,
@@ -368,7 +415,15 @@ def ui_create_client(
         )
 
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "client.created", "client", c.id, c.name)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "client.created",
+        "client",
+        c.id,
+        c.name,
+        tenant_id=tenant_id,
+    )
     return RedirectResponse(url="/ui/clients", status_code=303)
 
 
@@ -378,14 +433,25 @@ def ui_delete_client(
     client_id: int,
     db: Session = Depends(get_db),
 ):
-    client = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
+    tenant_id = _get_tenant_id(request)
+    client = db.execute(
+        select(Client).where(Client.id == client_id, Client.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if client is None:
         raise HTTPException(status_code=404, detail="client not found")
     name = client.name
     db.delete(client)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "client.deleted", "client", client_id, name)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "client.deleted",
+        "client",
+        client_id,
+        name,
+        tenant_id=tenant_id,
+    )
     return RedirectResponse(url="/ui/clients", status_code=303)
 
 
@@ -426,7 +492,10 @@ def ui_create_order(
     comment: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
-    client = db.execute(select(Client).where(Client.id == client_id)).scalar_one_or_none()
+    tenant_id = _get_tenant_id(request)
+    client = db.execute(
+        select(Client).where(Client.id == client_id, Client.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if client is None:
         return _render_orders(
             request,
@@ -485,6 +554,7 @@ def ui_create_order(
     comment_clean = comment.strip() if comment else None
 
     o = Order(
+        tenant_id=tenant_id,
         client_id=client_id,
         title=title_clean,
         price=price_dec,
@@ -495,7 +565,15 @@ def ui_create_order(
     db.commit()
     db.refresh(o)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "order.created", "order", o.id, o.title)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "order.created",
+        "order",
+        o.id,
+        o.title,
+        tenant_id=tenant_id,
+    )
 
     return RedirectResponse(url=f"/ui/orders/{o.id}", status_code=303)
 
@@ -506,14 +584,25 @@ def ui_delete_order(
     order_id: int,
     db: Session = Depends(get_db),
 ):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    tenant_id = _get_tenant_id(request)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
     title = order.title
     db.delete(order)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "order.deleted", "order", order_id, title)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "order.deleted",
+        "order",
+        order_id,
+        title,
+        tenant_id=tenant_id,
+    )
     return RedirectResponse(url="/ui/orders", status_code=303)
 
 
@@ -523,18 +612,27 @@ def ui_order_detail(
     order_id: int,
     db: Session = Depends(get_db),
 ):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    tenant_id = _get_tenant_id(request)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
-    client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+    client = db.execute(
+        select(Client).where(Client.id == order.client_id, Client.tenant_id == tenant_id)
+    ).scalar_one_or_none()
 
     payments = db.execute(
-        select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+        select(Payment)
+        .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
+        .order_by(Payment.id.desc())
     ).scalars().all()
 
     paid_total_raw = db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.order_id == order_id, Payment.tenant_id == tenant_id
+        )
     ).scalar_one()
 
     paid_total = _as_decimal(paid_total_raw)
@@ -565,18 +663,27 @@ def ui_add_payment(
     amount: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    tenant_id = _get_tenant_id(request)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
     amount_dec = _to_decimal(amount, "amount")
     if amount_dec <= Decimal("0.00"):
         payments = db.execute(
-            select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+            select(Payment)
+            .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
+            .order_by(Payment.id.desc())
         ).scalars().all()
-        client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+        client = db.execute(
+            select(Client).where(Client.id == order.client_id, Client.tenant_id == tenant_id)
+        ).scalar_one_or_none()
         paid_total_raw = db.execute(
-            select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.order_id == order_id, Payment.tenant_id == tenant_id
+            )
         ).scalar_one()
         paid_total = _as_decimal(paid_total_raw)
         price = _as_decimal(order.price)
@@ -600,7 +707,9 @@ def ui_add_payment(
         )
 
     paid_total_raw = db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.order_id == order_id, Payment.tenant_id == tenant_id
+        )
     ).scalar_one()
     paid_total = _as_decimal(paid_total_raw)
     price = _as_decimal(order.price)
@@ -608,9 +717,13 @@ def ui_add_payment(
     # защита от переплаты
     if paid_total + amount_dec > price:
         payments = db.execute(
-            select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+            select(Payment)
+            .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
+            .order_by(Payment.id.desc())
         ).scalars().all()
-        client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+        client = db.execute(
+            select(Client).where(Client.id == order.client_id, Client.tenant_id == tenant_id)
+        ).scalar_one_or_none()
         balance = price - paid_total
 
         return templates.TemplateResponse(
@@ -630,11 +743,19 @@ def ui_add_payment(
             status_code=409,
         )
 
-    p = Payment(order_id=order_id, amount=amount_dec)
+    p = Payment(tenant_id=tenant_id, order_id=order_id, amount=amount_dec)
     db.add(p)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "payment.created", "payment", p.id, str(p.amount))
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "payment.created",
+        "payment",
+        p.id,
+        str(p.amount),
+        tenant_id=tenant_id,
+    )
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
@@ -645,14 +766,25 @@ def ui_delete_payment(
     payment_id: int,
     db: Session = Depends(get_db),
 ):
-    payment = db.execute(select(Payment).where(Payment.id == payment_id)).scalar_one_or_none()
+    tenant_id = _get_tenant_id(request)
+    payment = db.execute(
+        select(Payment).where(Payment.id == payment_id, Payment.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if payment is None:
         raise HTTPException(status_code=404, detail="payment not found")
     order_id = payment.order_id
     db.delete(payment)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "payment.deleted", "payment", payment_id, str(payment.amount))
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "payment.deleted",
+        "payment",
+        payment_id,
+        str(payment.amount),
+        tenant_id=tenant_id,
+    )
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
 
@@ -663,7 +795,10 @@ def ui_update_order_status(
     status: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    tenant_id = _get_tenant_id(request)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
@@ -674,7 +809,15 @@ def ui_update_order_status(
     order.status = status
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "order.status_updated", "order", order_id, status)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "order.status_updated",
+        "order",
+        order_id,
+        status,
+        tenant_id=tenant_id,
+    )
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
@@ -686,18 +829,27 @@ def ui_update_order_price(
     price: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    order = db.execute(select(Order).where(Order.id == order_id)).scalar_one_or_none()
+    tenant_id = _get_tenant_id(request)
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
     new_price = _to_decimal(price, "price")
     if new_price < Decimal("0.00"):
         payments = db.execute(
-            select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+            select(Payment)
+            .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
+            .order_by(Payment.id.desc())
         ).scalars().all()
-        client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+        client = db.execute(
+            select(Client).where(Client.id == order.client_id, Client.tenant_id == tenant_id)
+        ).scalar_one_or_none()
         paid_total_raw = db.execute(
-            select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.order_id == order_id, Payment.tenant_id == tenant_id
+            )
         ).scalar_one()
         paid_total = _as_decimal(paid_total_raw)
         price = _as_decimal(order.price)
@@ -721,16 +873,22 @@ def ui_update_order_price(
         )
 
     paid_total_raw = db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == order_id)
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.order_id == order_id, Payment.tenant_id == tenant_id
+        )
     ).scalar_one()
     paid_total = _as_decimal(paid_total_raw)
     price = _as_decimal(order.price)
 
     if new_price < paid_total:
         payments = db.execute(
-            select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+            select(Payment)
+            .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
+            .order_by(Payment.id.desc())
         ).scalars().all()
-        client = db.execute(select(Client).where(Client.id == order.client_id)).scalar_one_or_none()
+        client = db.execute(
+            select(Client).where(Client.id == order.client_id, Client.tenant_id == tenant_id)
+        ).scalar_one_or_none()
         balance = price - paid_total
 
         return templates.TemplateResponse(
@@ -753,7 +911,15 @@ def ui_update_order_price(
     order.price = new_price
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "order.price_updated", "order", order_id, str(new_price))
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "order.price_updated",
+        "order",
+        order_id,
+        str(new_price),
+        tenant_id=tenant_id,
+    )
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
@@ -771,7 +937,12 @@ def ui_activity(
     date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    stmt = select(ActivityLog).order_by(ActivityLog.id.desc())
+    tenant_id = _get_tenant_id(request)
+    stmt = (
+        select(ActivityLog)
+        .where(ActivityLog.tenant_id == tenant_id)
+        .order_by(ActivityLog.id.desc())
+    )
     if user_id:
         stmt = stmt.where(ActivityLog.user_id == user_id)
     if entity_type:
@@ -836,7 +1007,12 @@ def ui_reminders(
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Reminder).order_by(Reminder.due_at.asc())
+    tenant_id = _get_tenant_id(request)
+    stmt = (
+        select(Reminder)
+        .where(Reminder.tenant_id == tenant_id)
+        .order_by(Reminder.due_at.asc())
+    )
     if status in {"open", "done"}:
         stmt = stmt.where(Reminder.status == status)
     if overdue == "1":
@@ -854,13 +1030,15 @@ def ui_reminders(
     total_pages = max(1, (total + page_size - 1) // page_size)
     open_count = db.execute(
         select(func.count()).select_from(
-            select(Reminder.id).where(Reminder.status == "open").subquery()
+            select(Reminder.id)
+            .where(Reminder.tenant_id == tenant_id, Reminder.status == "open")
+            .subquery()
         )
     ).scalar_one()
     overdue_count = db.execute(
         select(func.count()).select_from(
             select(Reminder.id)
-            .where(Reminder.status == "open")
+            .where(Reminder.tenant_id == tenant_id, Reminder.status == "open")
             .where(Reminder.due_at < datetime.utcnow())
             .subquery()
         )
@@ -908,8 +1086,9 @@ def ui_import_clients(
     dry_run: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
+    tenant_id = _get_tenant_id(request)
     rows = _read_csv(file)
-    created, errors = _process_clients(rows, db)
+    created, errors = _process_clients(rows, db, tenant_id)
     if errors:
         db.rollback()
     elif dry_run == "1":
@@ -919,7 +1098,15 @@ def ui_import_clients(
         user = getattr(request.state, "user", None)
         if user:
             for _ in range(created):
-                log_activity(db, getattr(user, "id", None), "client.created", "client", None, "CSV import")
+                log_activity(
+                    db,
+                    getattr(user, "id", None),
+                    "client.created",
+                    "client",
+                    None,
+                    "CSV import",
+                    tenant_id=tenant_id,
+                )
     return templates.TemplateResponse(
         request,
         "import.html",
@@ -942,8 +1129,9 @@ def ui_import_orders(
     dry_run: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
+    tenant_id = _get_tenant_id(request)
     rows = _read_csv(file)
-    created, errors = _process_orders(rows, db)
+    created, errors = _process_orders(rows, db, tenant_id)
     if errors:
         db.rollback()
     elif dry_run == "1":
@@ -953,7 +1141,15 @@ def ui_import_orders(
         user = getattr(request.state, "user", None)
         if user:
             for _ in range(created):
-                log_activity(db, getattr(user, "id", None), "order.created", "order", None, "CSV import")
+                log_activity(
+                    db,
+                    getattr(user, "id", None),
+                    "order.created",
+                    "order",
+                    None,
+                    "CSV import",
+                    tenant_id=tenant_id,
+                )
     return templates.TemplateResponse(
         request,
         "import.html",

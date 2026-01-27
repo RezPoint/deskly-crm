@@ -5,12 +5,13 @@ from decimal import Decimal
 from datetime import datetime, time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Response, HTTPException, Query
+from fastapi import APIRouter, Depends, Response, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
 from ..db import get_db
 from ..models import Client, Order, Payment
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/export", tags=["export"])
 
@@ -29,6 +30,7 @@ def _parse_date(value: Optional[str], field: str, is_end: bool = False) -> Optio
 
 @router.get("/orders.csv")
 def export_orders_csv(
+    request: Request,
     client_id: Optional[int] = Query(None, ge=1),
     status: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
@@ -36,6 +38,8 @@ def export_orders_csv(
     date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
+    get_current_user(request, db)
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
     start_dt = _parse_date(date_from, "date_from", is_end=False)
     end_dt = _parse_date(date_to, "date_to", is_end=True)
     if status and status not in {"new", "in_progress", "done", "canceled"}:
@@ -47,11 +51,13 @@ def export_orders_csv(
     paid_map = dict(
         db.execute(
             select(Payment.order_id, func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.tenant_id == tenant_id)
             .group_by(Payment.order_id)
         ).all()
     )
 
     stmt = select(Order, Client).join(Client, Client.id == Order.client_id)
+    stmt = stmt.where(Order.tenant_id == tenant_id, Client.tenant_id == tenant_id)
 
     if client_id is not None:
         stmt = stmt.where(Order.client_id == client_id)
@@ -102,8 +108,16 @@ def export_orders_csv(
 
 
 @router.get("/clients.csv")
-def export_clients_csv(db: Session = Depends(get_db)):
-    clients = db.execute(select(Client).order_by(Client.id.desc())).scalars().all()
+def export_clients_csv(request: Request, db: Session = Depends(get_db)):
+    get_current_user(request, db)
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    clients = (
+        db.execute(
+            select(Client).where(Client.tenant_id == tenant_id).order_by(Client.id.desc())
+        )
+        .scalars()
+        .all()
+    )
 
     buf = StringIO()
     writer = csv.writer(buf)

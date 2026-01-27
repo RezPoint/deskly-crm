@@ -32,7 +32,12 @@ def list_reminders(
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
-    stmt = select(Reminder).order_by(Reminder.due_at.asc())
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    stmt = (
+        select(Reminder)
+        .where(Reminder.tenant_id == tenant_id)
+        .order_by(Reminder.due_at.asc())
+    )
     if status:
         stmt = stmt.where(Reminder.status == status.value)
     if overdue is True:
@@ -54,7 +59,9 @@ def list_reminders(
 @router.post("", response_model=ReminderOut)
 def create_reminder(payload: ReminderCreate, request: Request, db: Session = Depends(get_db)):
     get_current_user(request, db)
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
     r = Reminder(
+        tenant_id=tenant_id,
         title=payload.title.strip(),
         due_at=payload.due_at,
         status=ReminderStatus.open.value,
@@ -65,7 +72,15 @@ def create_reminder(payload: ReminderCreate, request: Request, db: Session = Dep
     db.commit()
     db.refresh(r)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "reminder.created", "reminder", r.id, r.title)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "reminder.created",
+        "reminder",
+        r.id,
+        r.title,
+        tenant_id=tenant_id,
+    )
     return r
 
 
@@ -74,28 +89,50 @@ def update_reminder(
     reminder_id: int, payload: ReminderUpdate, request: Request, db: Session = Depends(get_db)
 ):
     get_current_user(request, db)
-    r = db.execute(select(Reminder).where(Reminder.id == reminder_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    r = db.execute(
+        select(Reminder).where(Reminder.id == reminder_id, Reminder.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if r is None:
         raise HTTPException(status_code=404, detail="reminder not found")
     r.status = payload.status.value
     db.commit()
     db.refresh(r)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "reminder.status_updated", "reminder", r.id, r.status)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "reminder.status_updated",
+        "reminder",
+        r.id,
+        r.status,
+        tenant_id=tenant_id,
+    )
     return r
 
 
 @router.delete("/{reminder_id}", status_code=204)
 def delete_reminder(reminder_id: int, request: Request, db: Session = Depends(get_db)):
     get_current_user(request, db)
-    r = db.execute(select(Reminder).where(Reminder.id == reminder_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    r = db.execute(
+        select(Reminder).where(Reminder.id == reminder_id, Reminder.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if r is None:
         raise HTTPException(status_code=404, detail="reminder not found")
     title = r.title
     db.delete(r)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "reminder.deleted", "reminder", reminder_id, title)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "reminder.deleted",
+        "reminder",
+        reminder_id,
+        title,
+        tenant_id=tenant_id,
+    )
 
 
 @router.get("/ui", response_class=HTMLResponse)
@@ -109,7 +146,12 @@ def ui_reminders(
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
-    stmt = select(Reminder).order_by(Reminder.due_at.asc())
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    stmt = (
+        select(Reminder)
+        .where(Reminder.tenant_id == tenant_id)
+        .order_by(Reminder.due_at.asc())
+    )
     if status in {"open", "done"}:
         stmt = stmt.where(Reminder.status == status)
     if overdue == "1":
@@ -126,10 +168,12 @@ def ui_reminders(
         stmt = stmt.where(Reminder.entity_id == entity_id)
     reminders = db.execute(stmt).scalars().all()
     open_count = db.execute(
-        select(Reminder).where(Reminder.status == "open")
+        select(Reminder).where(Reminder.tenant_id == tenant_id, Reminder.status == "open")
     ).scalars().all()
     overdue_count = db.execute(
-        select(Reminder).where(Reminder.status == "open").where(Reminder.due_at < datetime.utcnow())
+        select(Reminder)
+        .where(Reminder.tenant_id == tenant_id, Reminder.status == "open")
+        .where(Reminder.due_at < datetime.utcnow())
     ).scalars().all()
     return templates.TemplateResponse(
         request,
@@ -158,6 +202,7 @@ def ui_create_reminder(
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
     title_clean = (title or "").strip()
     if not title_clean:
         return RedirectResponse(url="/ui/reminders", status_code=303)
@@ -168,6 +213,7 @@ def ui_create_reminder(
     entity_type_clean = (entity_type or "").strip() or None
     entity_id_clean = int(entity_id) if (entity_id and entity_id.isdigit()) else None
     r = Reminder(
+        tenant_id=tenant_id,
         title=title_clean,
         due_at=due_dt,
         status="open",
@@ -178,7 +224,15 @@ def ui_create_reminder(
     db.commit()
     db.refresh(r)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "reminder.created", "reminder", r.id, r.title)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "reminder.created",
+        "reminder",
+        r.id,
+        r.title,
+        tenant_id=tenant_id,
+    )
     return RedirectResponse(url="/ui/reminders", status_code=303)
 
 
@@ -189,7 +243,8 @@ def ui_mark_all_done(
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
-    stmt = select(Reminder).where(Reminder.status == "open")
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    stmt = select(Reminder).where(Reminder.tenant_id == tenant_id, Reminder.status == "open")
     if scope == "overdue":
         stmt = stmt.where(Reminder.due_at < datetime.utcnow())
     reminders = db.execute(stmt).scalars().all()
@@ -199,32 +254,62 @@ def ui_mark_all_done(
     user = getattr(request.state, "user", None)
     if user:
         for r in reminders:
-            log_activity(db, getattr(user, "id", None), "reminder.status_updated", "reminder", r.id, "done")
+            log_activity(
+                db,
+                getattr(user, "id", None),
+                "reminder.status_updated",
+                "reminder",
+                r.id,
+                "done",
+                tenant_id=tenant_id,
+            )
     return RedirectResponse(url="/ui/reminders", status_code=303)
 
 
 @router.post("/ui/{reminder_id}/done", response_class=RedirectResponse)
 def ui_mark_done(reminder_id: int, request: Request, db: Session = Depends(get_db)):
     get_current_user(request, db)
-    r = db.execute(select(Reminder).where(Reminder.id == reminder_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    r = db.execute(
+        select(Reminder).where(Reminder.id == reminder_id, Reminder.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if r is None:
         raise HTTPException(status_code=404, detail="reminder not found")
     r.status = "done"
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "reminder.status_updated", "reminder", r.id, "done")
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "reminder.status_updated",
+        "reminder",
+        r.id,
+        "done",
+        tenant_id=tenant_id,
+    )
     return RedirectResponse(url="/ui/reminders", status_code=303)
 
 
 @router.post("/ui/{reminder_id}/delete", response_class=RedirectResponse)
 def ui_delete_reminder(reminder_id: int, request: Request, db: Session = Depends(get_db)):
     get_current_user(request, db)
-    r = db.execute(select(Reminder).where(Reminder.id == reminder_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request.state, "user", None), "tenant_id", 1)
+    r = db.execute(
+        select(Reminder).where(Reminder.id == reminder_id, Reminder.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if r is None:
         raise HTTPException(status_code=404, detail="reminder not found")
     title = r.title
     db.delete(r)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "reminder.deleted", "reminder", reminder_id, title)
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "reminder.deleted",
+        "reminder",
+        reminder_id,
+        title,
+        tenant_id=tenant_id,
+    )
     return RedirectResponse(url="/ui/reminders", status_code=303)

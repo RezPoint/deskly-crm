@@ -14,12 +14,17 @@ router = APIRouter(prefix="/api/payments", tags=["payments"])
 
 @router.post("", response_model=PaymentOut)
 def create_payment(payload: PaymentCreate, request: Request, db: Session = Depends(get_db)):
-    order = db.execute(select(Order).where(Order.id == payload.order_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    order = db.execute(
+        select(Order).where(Order.id == payload.order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
     paid_total_raw = db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.order_id == payload.order_id)
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .where(Payment.order_id == payload.order_id, Payment.tenant_id == tenant_id)
     ).scalar_one()
 
     paid_total = Decimal(str(paid_total_raw))
@@ -28,33 +33,61 @@ def create_payment(payload: PaymentCreate, request: Request, db: Session = Depen
     if paid_total + payload.amount > price:
         raise HTTPException(status_code=409, detail="payment exceeds order remaining balance")
 
-    p = Payment(order_id=payload.order_id, amount=payload.amount)
+    p = Payment(tenant_id=tenant_id, order_id=payload.order_id, amount=payload.amount)
     db.add(p)
     db.commit()
     db.refresh(p)
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "payment.created", "payment", p.id, str(p.amount))
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "payment.created",
+        "payment",
+        p.id,
+        str(p.amount),
+        tenant_id=tenant_id,
+    )
     return p
 
 
 @router.get("/by-order/{order_id}", response_model=list[PaymentOut])
-def list_payments_by_order(order_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
-    order = db.execute(select(Order.id).where(Order.id == order_id)).scalar_one_or_none()
+def list_payments_by_order(
+    request: Request, order_id: int = Path(..., ge=1), db: Session = Depends(get_db)
+):
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    order = db.execute(
+        select(Order.id).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
 
     return db.execute(
-        select(Payment).where(Payment.order_id == order_id).order_by(Payment.id.desc())
+        select(Payment)
+        .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
+        .order_by(Payment.id.desc())
     ).scalars().all()
 
 
 @router.delete("/{payment_id}", status_code=204)
 def delete_payment(request: Request, payment_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
-    payment = db.execute(select(Payment).where(Payment.id == payment_id)).scalar_one_or_none()
+    tenant_id = getattr(getattr(request, "state", None), "user", None)
+    tenant_id = getattr(tenant_id, "tenant_id", 1)
+    payment = db.execute(
+        select(Payment).where(Payment.id == payment_id, Payment.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if payment is None:
         raise HTTPException(status_code=404, detail="payment not found")
     amount = payment.amount
     db.delete(payment)
     db.commit()
     user = getattr(request.state, "user", None)
-    log_activity(db, getattr(user, "id", None), "payment.deleted", "payment", payment_id, str(amount))
+    log_activity(
+        db,
+        getattr(user, "id", None),
+        "payment.deleted",
+        "payment",
+        payment_id,
+        str(amount),
+        tenant_id=tenant_id,
+    )

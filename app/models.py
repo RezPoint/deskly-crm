@@ -18,6 +18,7 @@ class Client(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     name = Column(String(120), nullable=False)
     phone = Column(String(50), nullable=True)
     telegram = Column(String(80), nullable=True)
@@ -31,6 +32,7 @@ class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
 
     title = Column(String(200), nullable=False)
@@ -47,6 +49,7 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
 
     amount = Column(Numeric(12, 2), nullable=False)
@@ -60,6 +63,7 @@ class User(Base):
     __table_args__ = (UniqueConstraint("email", name="uq_users_email"),)
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     email = Column(String(200), nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(30), nullable=False, default="owner")  # owner/admin/viewer
@@ -70,6 +74,7 @@ class ActivityLog(Base):
     __tablename__ = "activity_log"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     action = Column(String(50), nullable=False)
     entity_type = Column(String(30), nullable=False)
@@ -82,6 +87,7 @@ class Reminder(Base):
     __tablename__ = "reminders"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     title = Column(String(200), nullable=False)
     due_at = Column(DateTime(timezone=True), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="open")  # open/done
