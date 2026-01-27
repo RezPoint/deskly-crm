@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from ..db import get_db
-from ..models import Client, Order, Payment, ActivityLog
+from ..models import Client, Order, Payment, ActivityLog, Reminder
 from ..activity import log_activity
 from ..validators import validate_phone, validate_telegram
 
@@ -769,6 +769,27 @@ def ui_activity(
         request,
         "activity.html",
         {"request": request, "logs": logs},
+    )
+
+
+@router.get("/reminders")
+def ui_reminders(
+    request: Request,
+    status: Optional[str] = Query(None),
+    overdue: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    stmt = select(Reminder).order_by(Reminder.due_at.asc())
+    if status in {"open", "done"}:
+        stmt = stmt.where(Reminder.status == status)
+    if overdue == "1":
+        stmt = stmt.where(Reminder.status == "open")
+        stmt = stmt.where(Reminder.due_at < datetime.utcnow())
+    reminders = db.execute(stmt).scalars().all()
+    return templates.TemplateResponse(
+        request,
+        "reminders.html",
+        {"request": request, "reminders": reminders, "filter_status": status or "", "filter_overdue": overdue or ""},
     )
     
     
