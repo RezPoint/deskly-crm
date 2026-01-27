@@ -793,6 +793,8 @@ def ui_reminders(
     request: Request,
     status: Optional[str] = Query(None),
     overdue: Optional[str] = Query(None),
+    entity_type: Optional[str] = Query(None),
+    entity_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
 ):
     stmt = select(Reminder).order_by(Reminder.due_at.asc())
@@ -801,11 +803,37 @@ def ui_reminders(
     if overdue == "1":
         stmt = stmt.where(Reminder.status == "open")
         stmt = stmt.where(Reminder.due_at < datetime.utcnow())
+    if entity_type:
+        stmt = stmt.where(Reminder.entity_type == entity_type)
+    if entity_id:
+        stmt = stmt.where(Reminder.entity_id == entity_id)
     reminders = db.execute(stmt).scalars().all()
+    open_count = db.execute(
+        select(func.count()).select_from(
+            select(Reminder.id).where(Reminder.status == "open").subquery()
+        )
+    ).scalar_one()
+    overdue_count = db.execute(
+        select(func.count()).select_from(
+            select(Reminder.id)
+            .where(Reminder.status == "open")
+            .where(Reminder.due_at < datetime.utcnow())
+            .subquery()
+        )
+    ).scalar_one()
     return templates.TemplateResponse(
         request,
         "reminders.html",
-        {"request": request, "reminders": reminders, "filter_status": status or "", "filter_overdue": overdue or ""},
+        {
+            "request": request,
+            "reminders": reminders,
+            "filter_status": status or "",
+            "filter_overdue": overdue or "",
+            "filter_entity_type": entity_type or "",
+            "filter_entity_id": entity_id or "",
+            "open_count": open_count,
+            "overdue_count": overdue_count,
+        },
     )
     
     
