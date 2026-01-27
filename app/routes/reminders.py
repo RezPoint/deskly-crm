@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api/reminders", tags=["reminders"])
 def list_reminders(
     request: Request,
     status: Optional[ReminderStatus] = None,
+    overdue: Optional[bool] = None,
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -30,6 +31,9 @@ def list_reminders(
     stmt = select(Reminder).order_by(Reminder.due_at.asc())
     if status:
         stmt = stmt.where(Reminder.status == status.value)
+    if overdue is True:
+        stmt = stmt.where(Reminder.status == ReminderStatus.open.value)
+        stmt = stmt.where(Reminder.due_at < datetime.utcnow())
     stmt = stmt.limit(limit)
     return db.execute(stmt).scalars().all()
 
@@ -85,17 +89,26 @@ def delete_reminder(reminder_id: int, request: Request, db: Session = Depends(ge
 def ui_reminders(
     request: Request,
     status: Optional[str] = Query(None),
+    overdue: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
     stmt = select(Reminder).order_by(Reminder.due_at.asc())
     if status in {"open", "done"}:
         stmt = stmt.where(Reminder.status == status)
+    if overdue == "1":
+        stmt = stmt.where(Reminder.status == "open")
+        stmt = stmt.where(Reminder.due_at < datetime.utcnow())
     reminders = db.execute(stmt).scalars().all()
     return templates.TemplateResponse(
         request,
         "reminders.html",
-        {"request": request, "reminders": reminders, "filter_status": status or ""},
+        {
+            "request": request,
+            "reminders": reminders,
+            "filter_status": status or "",
+            "filter_overdue": overdue or "",
+        },
     )
 
 

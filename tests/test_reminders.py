@@ -14,3 +14,14 @@ def test_reminder_crud(client):
     r = client.patch(f"/api/reminders/{reminder_id}", json={"status": "done"})
     assert r.status_code == 200
     assert r.json()["status"] == "done"
+
+
+def test_reminder_overdue_filter(client):
+    past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    r = client.post("/api/reminders", json={"title": "Past", "due_at": past})
+    assert r.status_code == 200
+    past_id = r.json()["id"]
+
+    r = client.get("/api/reminders", params={"overdue": "true"})
+    assert r.status_code == 200
+    assert any(rem["id"] == past_id for rem in r.json())

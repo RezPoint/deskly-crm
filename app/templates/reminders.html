@@ -12,6 +12,10 @@
       <option value="open" {% if filter_status == "open" %}selected{% endif %}>open</option>
       <option value="done" {% if filter_status == "done" %}selected{% endif %}>done</option>
     </select>
+    <select name="overdue">
+      <option value="">All</option>
+      <option value="1" {% if filter_overdue == "1" %}selected{% endif %}>overdue only</option>
+    </select>
     <button type="submit">Apply</button>
   </form>
 </div>
