@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% set title = "Activity -- DesklyCRM" %}
+
+{% block content %}
+<h1>Activity</h1>
+
+<div class="card">
+  <h3>🧾 Recent events</h3>
+  {% if logs|length == 0 %}
+    <p class="muted">No activity yet.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Action</th>
+          <th>Entity</th>
+          <th>User</th>
+          <th>Message</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for l in logs %}
+        <tr>
+          <td>{{ l.id }}</td>
+          <td>{{ l.action }}</td>
+          <td>{{ l.entity_type }}{% if l.entity_id %} #{{ l.entity_id }}{% endif %}</td>
+          <td>{{ l.user_id or "-" }}</td>
+          <td class="muted">{{ l.message or "" }}</td>
+          <td class="muted">{{ l.created_at|dt }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}

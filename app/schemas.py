@@ -106,3 +106,13 @@ class UserOut(APIModel):
 class LoginIn(APIModel):
     email: str
     password: str
+
+
+class ActivityLogOut(APIModel):
+    id: int
+    user_id: Optional[int] = None
+    action: str
+    entity_type: str
+    entity_id: Optional[int] = None
+    message: Optional[str] = None
+    created_at: datetime

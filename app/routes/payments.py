@@ -1,18 +1,19 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
 from ..db import get_db
 from ..models import Payment, Order
 from ..schemas import PaymentCreate, PaymentOut
+from ..activity import log_activity
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
 
 @router.post("", response_model=PaymentOut)
-def create_payment(payload: PaymentCreate, db: Session = Depends(get_db)):
+def create_payment(payload: PaymentCreate, request: Request, db: Session = Depends(get_db)):
     order = db.execute(select(Order).where(Order.id == payload.order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
@@ -31,6 +32,8 @@ def create_payment(payload: PaymentCreate, db: Session = Depends(get_db)):
     db.add(p)
     db.commit()
     db.refresh(p)
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "payment.created", "payment", p.id, str(p.amount))
     return p
 
 
@@ -46,9 +49,12 @@ def list_payments_by_order(order_id: int = Path(..., ge=1), db: Session = Depend
 
 
 @router.delete("/{payment_id}", status_code=204)
-def delete_payment(payment_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+def delete_payment(request: Request, payment_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
     payment = db.execute(select(Payment).where(Payment.id == payment_id)).scalar_one_or_none()
     if payment is None:
         raise HTTPException(status_code=404, detail="payment not found")
+    amount = payment.amount
     db.delete(payment)
     db.commit()
+    user = getattr(request.state, "user", None)
+    log_activity(db, getattr(user, "id", None), "payment.deleted", "payment", payment_id, str(amount))
