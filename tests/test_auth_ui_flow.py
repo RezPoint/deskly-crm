@@ -1,4 +1,6 @@
-from app.models import User
+from sqlalchemy import select
+
+from app.models import User, Tenant
 from app.security import hash_password
 
 
@@ -34,7 +36,9 @@ def test_anon_redirected_to_login(client, anon_client):
 def test_viewer_restrictions_ui(client):
     db = client.app.state.SessionLocal()
     try:
+        tenant = db.execute(select(Tenant)).scalar_one()
         viewer = User(email="viewer2@example.com", password_hash=hash_password("viewer123"), role="viewer")
+        viewer.tenant_id = tenant.id
         db.add(viewer)
         db.commit()
     finally:

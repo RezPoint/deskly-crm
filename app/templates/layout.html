@@ -123,6 +123,7 @@
     {% if request and request.state and request.state.user and request.state.user.role != "viewer" %}
       <a href="/ui/users" class="{% if path.startswith('/ui/users') %}active{% endif %}">Users</a>
       <a href="/ui/tenant" class="{% if path.startswith('/ui/tenant') %}active{% endif %}">Workspace</a>
+      <a href="/ui/invites" class="{% if path.startswith('/ui/invites') %}active{% endif %}">Invites</a>
       <a href="/ui/import" class="{% if path.startswith('/ui/import') %}active{% endif %}">Import</a>
     {% endif %}
     <a href="/ui/activity" class="{% if path.startswith('/ui/activity') %}active{% endif %}">Activity</a>

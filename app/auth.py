@@ -20,6 +20,8 @@ PUBLIC_PATHS = {
     "/logout",
     "/setup",
     "/api/auth/login",
+    "/invite",
+    "/api/invites/accept",
 }
 
 

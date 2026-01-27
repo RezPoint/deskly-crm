@@ -107,3 +107,17 @@ class Reminder(Base):
     entity_type = Column(String(30), nullable=True)
     entity_id = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class Invite(Base):
+    __tablename__ = "invites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    email = Column(String(200), nullable=False)
+    role = Column(String(30), nullable=False, default="viewer")
+    token = Column(String(128), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    accepted_by = Column(Integer, ForeignKey("users.id"), nullable=True)
