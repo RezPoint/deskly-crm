@@ -12,12 +12,10 @@ from ..db import get_db
 from ..models import User
 from ..security import create_access_token, hash_password, verify_password
 from ..auth import get_current_user, require_role
+from .ui import templates
 
 
 router = APIRouter(tags=["auth"])
-
-TEMPLATES_DIR = __import__("pathlib").Path(__file__).resolve().parents[1] / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 def _get_user_by_email(db: Session, email: str) -> Optional[User]:
