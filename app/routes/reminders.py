@@ -24,6 +24,8 @@ def list_reminders(
     request: Request,
     status: Optional[ReminderStatus] = None,
     overdue: Optional[bool] = None,
+    entity_type: Optional[str] = Query(None),
+    entity_id: Optional[int] = Query(None, ge=1),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -34,6 +36,10 @@ def list_reminders(
     if overdue is True:
         stmt = stmt.where(Reminder.status == ReminderStatus.open.value)
         stmt = stmt.where(Reminder.due_at < datetime.utcnow())
+    if entity_type:
+        stmt = stmt.where(Reminder.entity_type == entity_type)
+    if entity_id:
+        stmt = stmt.where(Reminder.entity_id == entity_id)
     stmt = stmt.limit(limit)
     return db.execute(stmt).scalars().all()
 
@@ -90,6 +96,8 @@ def ui_reminders(
     request: Request,
     status: Optional[str] = Query(None),
     overdue: Optional[str] = Query(None),
+    entity_type: Optional[str] = Query(None),
+    entity_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
@@ -99,6 +107,10 @@ def ui_reminders(
     if overdue == "1":
         stmt = stmt.where(Reminder.status == "open")
         stmt = stmt.where(Reminder.due_at < datetime.utcnow())
+    if entity_type:
+        stmt = stmt.where(Reminder.entity_type == entity_type)
+    if entity_id:
+        stmt = stmt.where(Reminder.entity_id == entity_id)
     reminders = db.execute(stmt).scalars().all()
     return templates.TemplateResponse(
         request,
@@ -108,6 +120,8 @@ def ui_reminders(
             "reminders": reminders,
             "filter_status": status or "",
             "filter_overdue": overdue or "",
+            "filter_entity_type": entity_type or "",
+            "filter_entity_id": entity_id or "",
         },
     )
 

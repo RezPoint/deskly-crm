@@ -25,3 +25,17 @@ def test_reminder_overdue_filter(client):
     r = client.get("/api/reminders", params={"overdue": "true"})
     assert r.status_code == 200
     assert any(rem["id"] == past_id for rem in r.json())
+
+
+def test_reminder_entity_filters(client):
+    due_at = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+    r = client.post(
+        "/api/reminders",
+        json={"title": "Link", "due_at": due_at, "entity_type": "order", "entity_id": 123},
+    )
+    assert r.status_code == 200
+    reminder_id = r.json()["id"]
+
+    r = client.get("/api/reminders", params={"entity_type": "order", "entity_id": 123})
+    assert r.status_code == 200
+    assert any(rem["id"] == reminder_id for rem in r.json())
