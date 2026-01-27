@@ -187,6 +187,8 @@ def api_reset_password(user_id: int, request: Request, payload: dict, db: Sessio
 @router.get("/ui/users", response_class=HTMLResponse)
 def ui_users(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
+    if user.role == "viewer":
+        return RedirectResponse(url="/ui/clients", status_code=303)
     require_role(user, {"owner", "admin"})
     users = db.execute(select(User).order_by(User.id.asc())).scalars().all()
     return templates.TemplateResponse(
