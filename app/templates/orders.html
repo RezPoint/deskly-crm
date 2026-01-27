@@ -74,9 +74,9 @@
     </div>
   {% else %}
     <div class="row">
-      <span class="muted">Total price: {{ totals.price|money }}</span>
-      <span class="muted">Paid: {{ totals.paid|money }}</span>
-      <span class="muted">Balance: {{ totals.balance|money }}</span>
+      <span class="stat">Total {{ totals.price|money }}</span>
+      <span class="stat">Paid {{ totals.paid|money }}</span>
+      <span class="stat">Balance {{ totals.balance|money }}</span>
       <a class="muted" href="{{ summary_url }}">API summary</a>
     </div>
     <table>
