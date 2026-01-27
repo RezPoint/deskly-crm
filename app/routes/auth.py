@@ -12,7 +12,6 @@ from ..db import get_db
 from ..models import User
 from ..security import create_access_token, hash_password, verify_password
 from ..auth import get_current_user, require_role
-import os
 from .ui import templates
 
 
@@ -27,14 +26,8 @@ def _has_users(db: Session) -> bool:
     return db.execute(select(User.id)).first() is not None
 
 
-def _setup_allowed() -> bool:
-    return os.getenv("ALLOW_SETUP", "0") == "1"
-
-
 @router.get("/setup", response_class=HTMLResponse)
 def setup_page(request: Request, db: Session = Depends(get_db)):
-    if not _setup_allowed():
-        raise HTTPException(status_code=404, detail="setup disabled")
     if _has_users(db):
         return RedirectResponse(url="/login", status_code=303)
     return templates.TemplateResponse(
@@ -51,8 +44,6 @@ def setup_submit(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    if not _setup_allowed():
-        raise HTTPException(status_code=404, detail="setup disabled")
     if _has_users(db):
         return RedirectResponse(url="/login", status_code=303)
 
@@ -81,9 +72,7 @@ def setup_submit(
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, db: Session = Depends(get_db)):
     if not _has_users(db):
-        if _setup_allowed():
-            return RedirectResponse(url="/setup", status_code=303)
-        raise HTTPException(status_code=503, detail="no users and setup disabled")
+        return RedirectResponse(url="/setup", status_code=303)
     return templates.TemplateResponse(
         request,
         "login.html",
