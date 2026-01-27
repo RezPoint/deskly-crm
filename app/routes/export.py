@@ -125,3 +125,29 @@ def export_clients_csv(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="clients.csv"'},
     )
+
+
+@router.get("/templates/clients.csv")
+def export_clients_template():
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["name", "phone", "telegram", "notes"])
+    content = buf.getvalue()
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="clients_template.csv"'},
+    )
+
+
+@router.get("/templates/orders.csv")
+def export_orders_template():
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["client_id", "title", "price", "status", "comment"])
+    content = buf.getvalue()
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="orders_template.csv"'},
+    )

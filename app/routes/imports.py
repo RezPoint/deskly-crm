@@ -1,7 +1,8 @@
 import csv
 from io import StringIO
 from decimal import Decimal, InvalidOperation
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -35,6 +36,7 @@ def _read_csv(upload: UploadFile) -> list[dict]:
 def import_clients(
     request: Request,
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     rows = _read_csv(file)
@@ -69,6 +71,10 @@ def import_clients(
         db.rollback()
         raise HTTPException(status_code=422, detail=errors)
 
+    if dry_run:
+        db.rollback()
+        return {"created": created, "dry_run": True}
+
     db.commit()
     user = getattr(request.state, "user", None)
     if user:
@@ -81,6 +87,7 @@ def import_clients(
 def import_orders(
     request: Request,
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     rows = _read_csv(file)
@@ -133,6 +140,10 @@ def import_orders(
     if errors:
         db.rollback()
         raise HTTPException(status_code=422, detail=errors)
+
+    if dry_run:
+        db.rollback()
+        return {"created": created, "dry_run": True}
 
     db.commit()
     user = getattr(request.state, "user", None)
