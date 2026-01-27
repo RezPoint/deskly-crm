@@ -30,7 +30,8 @@
     a { text-decoration: none; color: var(--accent); }
     a:hover { text-decoration: underline; }
     nav { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
-    nav .brand { font-weight: 700; letter-spacing: 0.2px; margin-right: auto; color: var(--ink); }
+    nav .brand { font-weight: 700; letter-spacing: 0.2px; margin-right: auto; color: var(--ink); display: flex; gap: 8px; align-items: baseline; }
+    nav .brand .workspace { font-weight: 500; color: var(--muted); font-size: 12px; }
     nav a { padding: 6px 10px; border-radius: 999px; background: var(--accent-2); color: var(--accent); font-weight: 600; }
     nav a.active { background: var(--accent); color: #fff; }
     nav form { margin: 0; }
@@ -116,7 +117,12 @@
 <body>
   {% set path = request.url.path if request else "" %}
   <nav>
-    <span class="brand">DesklyCRM</span>
+    <span class="brand">
+      DesklyCRM
+      {% if request and request.state and request.state.tenant %}
+        <span class="workspace">Workspace: {{ request.state.tenant.name }}</span>
+      {% endif %}
+    </span>
     <a href="/ui/clients" class="{% if path.startswith('/ui/clients') %}active{% endif %}">Clients</a>
     <a href="/ui/orders" class="{% if path.startswith('/ui/orders') %}active{% endif %}">Orders</a>
     <a href="/docs">Swagger</a>
