@@ -5,7 +5,12 @@
 <h1>Activity</h1>
 
 <div class="card">
-  <h3>Filters</h3>
+  <div class="section-head">
+    <h3>Filters</h3>
+    <div class="actions">
+      <a class="link-muted" href="/ui/activity">Reset</a>
+    </div>
+  </div>
   <form method="get" action="/ui/activity" class="row">
     <input name="user_id" placeholder="User ID" value="{{ filter_user_id }}" />
     <input name="entity_type" placeholder="Entity (client/order/payment/reminder)" value="{{ filter_entity_type }}" />
@@ -13,12 +18,16 @@
     <input name="date_from" type="date" value="{{ filter_date_from }}" />
     <input name="date_to" type="date" value="{{ filter_date_to }}" />
     <button type="submit">Apply</button>
-    <a class="muted" href="/ui/activity">Reset</a>
   </form>
 </div>
 
 <div class="card">
-  <h3>Recent events</h3>
+  <div class="section-head">
+    <h3>Recent events</h3>
+    <div class="actions">
+      <span class="muted">Total: {{ logs|length }}</span>
+    </div>
+  </div>
   {% if logs|length == 0 %}
     <p class="muted">No activity yet.</p>
   {% else %}

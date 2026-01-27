@@ -35,6 +35,14 @@
     nav a { padding: 6px 10px; border-radius: 999px; background: var(--accent-2); color: var(--accent); font-weight: 600; }
     nav a.active { background: var(--accent); color: #fff; }
     nav form { margin: 0; }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .section-head h3 { margin: 0; }
     .card {
       border: 1px solid var(--line);
       border-radius: 16px;
@@ -45,6 +53,8 @@
     }
     .card h3 { display: flex; align-items: center; gap: 8px; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .row.tight { gap: 6px; }
+    .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     input, select, textarea, button {
       padding: 10px 12px;
       border-radius: 12px;
@@ -52,6 +62,7 @@
       background: #fff;
       font-family: "Inter", system-ui, sans-serif;
     }
+    .compact input, .compact select, .compact button { padding: 6px 8px; font-size: 12px; }
     input:focus, select:focus, textarea:focus, button:focus {
       outline: 2px solid rgba(47, 111, 94, 0.25);
       outline-offset: 2px;
@@ -112,6 +123,8 @@
     .btn-ghost:hover {
       background: var(--accent-2);
     }
+    .link-muted { color: var(--muted); font-weight: 600; }
+    .link-muted:hover { color: var(--ink); }
   </style>
 </head>
 <body>

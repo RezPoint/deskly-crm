@@ -9,7 +9,9 @@
 {% endif %}
 
 <div class="card">
-  <h3>Create invite</h3>
+  <div class="section-head">
+    <h3>Create invite</h3>
+  </div>
   <form method="post" action="/ui/invites" class="row">
     <input name="email" type="email" placeholder="Email" required />
     <select name="role">
@@ -23,7 +25,12 @@
 </div>
 
 <div class="card">
-  <h3>Pending invites</h3>
+  <div class="section-head">
+    <h3>Pending invites</h3>
+    <div class="actions">
+      <span class="muted">Total: {{ invites|length }}</span>
+    </div>
+  </div>
   <table>
     <thead>
       <tr>
