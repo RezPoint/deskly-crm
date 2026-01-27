@@ -8,6 +8,7 @@ from sqlalchemy import select, or_
 from ..db import get_db
 from ..models import Client
 from ..schemas import ClientCreate, ClientOut
+from ..validators import validate_phone, validate_telegram
 
 router = APIRouter(prefix="/api/clients", tags=["clients"])
 
@@ -74,6 +75,12 @@ def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
     phone = payload.phone.strip() if payload.phone else None
     telegram = payload.telegram.strip() if payload.telegram else None
     notes = payload.notes.strip() if payload.notes else None
+
+    try:
+        phone = validate_phone(phone)
+        telegram = validate_telegram(telegram)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     # простая защита от дублей:
     # если совпадает phone или telegram -- считаем, что это уже существующий клиент

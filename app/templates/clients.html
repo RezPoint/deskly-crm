@@ -9,8 +9,9 @@
 {% endif %}
 
 <div class="card">
+  <h3>Filters</h3>
   <form method="get" action="/ui/clients" class="row">
-    <input name="q" placeholder="Search name/phone/telegram" value="{{ q }}" />
+    <input name="q" placeholder="Search name/phone/telegram" value="{{ q }}" aria-label="Search clients" />
     <select name="sort">
       <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
       <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
@@ -26,18 +27,19 @@
 </div>
 
 <div class="card" id="add-client">
-  <h3>Add client</h3>
+  <h3>➕ Add client</h3>
   <form method="post" action="/ui/clients" class="row">
-    <input name="name" placeholder="Name *" value="{{ form_name }}" required />
-    <input name="phone" placeholder="Phone" value="{{ form_phone }}" />
-    <input name="telegram" placeholder="Telegram" value="{{ form_telegram }}" />
+    <input name="name" placeholder="Name *" value="{{ form_name }}" required autofocus />
+    <input name="phone" placeholder="Phone (+7 999 000-00-00)" value="{{ form_phone }}" type="tel" pattern="^[+\\d\\s()\\-]{3,25}$" title="Digits, spaces, +, -, parentheses (3-25 chars)" />
+    <input name="telegram" placeholder="Telegram (@username)" value="{{ form_telegram }}" pattern="^@?[A-Za-z0-9_]{5,32}$" title="5-32 chars: letters, numbers, underscore" />
     <input name="notes" placeholder="Notes" value="{{ form_notes }}" />
     <button type="submit">Create</button>
   </form>
+  <p class="muted">Phone or Telegram must be unique. Telegram is saved with @.</p>
 </div>
 
 <div class="card">
-  <h3>List</h3>
+  <h3>📒 List</h3>
   {% if clients|length == 0 %}
     <p class="muted">No clients yet. Add your first client to start tracking orders.</p>
     <div class="row">
@@ -46,27 +48,35 @@
   {% else %}
     <table>
       <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Phone</th>
-          <th>Telegram</th>
-          <th>Created</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for c in clients %}
-        <tr>
-          <td>{{ c.id }}</td>
-          <td>{{ c.name }}</td>
-          <td>{{ c.phone or "" }}</td>
-          <td>{{ c.telegram or "" }}</td>
-          <td class="muted">{{ c.created_at|dt }}</td>
-          <td class="actions">
-            <form method="post" action="/ui/clients/{{ c.id }}/delete" class="inline" data-confirm="Delete client and all related orders/payments?">
-              <button type="submit" class="danger">Delete</button>
-            </form>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Contacts</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for c in clients %}
+      <tr>
+        <td>{{ c.id }}</td>
+        <td>{{ c.name }}</td>
+        <td>
+          {% if c.phone %}
+            <span class="tag">📞 {{ c.phone }}</span>
+          {% endif %}
+          {% if c.telegram %}
+            <span class="tag">✈️ {{ c.telegram }}</span>
+          {% endif %}
+          {% if not c.phone and not c.telegram %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ c.created_at|dt }}</td>
+        <td class="actions">
+          <form method="post" action="/ui/clients/{{ c.id }}/delete" class="inline" data-confirm="Delete client and all related orders/payments?">
+            <button type="submit" class="danger">Delete</button>
+          </form>
           </td>
         </tr>
       {% endfor %}

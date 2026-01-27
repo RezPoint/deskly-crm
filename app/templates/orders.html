@@ -11,9 +11,9 @@
 <div class="card">
   <h3>Filters</h3>
   <form method="get" action="/ui/orders" class="row">
-    <input name="q" placeholder="Search title/comment" value="{{ filter_q }}" />
-    <input name="date_from" placeholder="Date from (YYYY-MM-DD)" value="{{ filter_date_from }}" />
-    <input name="date_to" placeholder="Date to (YYYY-MM-DD)" value="{{ filter_date_to }}" />
+    <input name="q" placeholder="Search title/comment" value="{{ filter_q }}" aria-label="Search orders" />
+    <input name="date_from" placeholder="Date from (YYYY-MM-DD)" value="{{ filter_date_from }}" type="date" />
+    <input name="date_to" placeholder="Date to (YYYY-MM-DD)" value="{{ filter_date_to }}" type="date" />
     <select name="sort">
       <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
       <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
@@ -44,28 +44,29 @@
 </div>
 
 <div class="card" id="add-order">
-  <h3>Add order</h3>
+  <h3>🧾 Add order</h3>
   <form method="post" action="/ui/orders" class="row">
-    <select name="client_id" required>
+    <select name="client_id" required aria-label="Client">
       {% for c in clients %}
         <option value="{{ c.id }}" {% if create_client_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.id }})</option>
       {% endfor %}
     </select>
-    <input name="title" placeholder="Title *" value="{{ create_title }}" required />
-    <input name="price" placeholder="Price (e.g. 15000 or 15000.00)" value="{{ create_price }}" />
-    <select name="status">
+    <input name="title" placeholder="Title *" value="{{ create_title }}" required autofocus />
+    <input name="price" placeholder="Price (e.g. 15000 or 15000.00)" value="{{ create_price }}" type="number" min="0" step="0.01" aria-label="Price" />
+    <select name="status" aria-label="Status">
       <option value="new" {% if create_status == "new" %}selected{% endif %}>new</option>
       <option value="in_progress" {% if create_status == "in_progress" %}selected{% endif %}>in_progress</option>
       <option value="done" {% if create_status == "done" %}selected{% endif %}>done</option>
       <option value="canceled" {% if create_status == "canceled" %}selected{% endif %}>canceled</option>
     </select>
-    <input name="comment" placeholder="Comment" value="{{ create_comment }}" />
+    <input name="comment" placeholder="Comment" value="{{ create_comment }}" maxlength="500" aria-label="Comment" />
     <button type="submit">Create</button>
   </form>
+  <p class="muted">Price must be 0 or greater. Status can be changed later.</p>
 </div>
 
 <div class="card">
-  <h3>List</h3>
+  <h3>📦 List</h3>
   {% if orders|length == 0 %}
     <p class="muted">No orders yet. Create one to start tracking payments.</p>
     <div class="row">
@@ -74,9 +75,9 @@
     </div>
   {% else %}
     <div class="row">
-      <span class="muted">Total price: {{ totals.price|money }}</span>
-      <span class="muted">Paid: {{ totals.paid|money }}</span>
-      <span class="muted">Balance: {{ totals.balance|money }}</span>
+      <span class="stat">Total {{ totals.price|money }}</span>
+      <span class="stat">Paid {{ totals.paid|money }}</span>
+      <span class="stat">Balance {{ totals.balance|money }}</span>
       <a class="muted" href="{{ summary_url }}">API summary</a>
     </div>
     <table>
@@ -85,7 +86,7 @@
           <th>ID</th>
           <th>Client</th>
           <th>Title</th>
-          <th>Status</th>
+        <th>Status</th>
           <th>Price</th>
           <th>Paid</th>
           <th>Balance</th>
@@ -99,7 +100,18 @@
           <td>{{ o.id }}</td>
           <td>{{ (client_map.get(o.client_id).name if client_map.get(o.client_id) else o.client_id) }}</td>
           <td>{{ o.title }}</td>
-          <td>{{ o.status }}</td>
+        <td>
+          <span class="pill {{ o.status }}">{{ o.status }}</span>
+          <form method="post" action="/ui/orders/{{ o.id }}/status" class="row">
+            <select name="status">
+              <option value="new" {% if o.status == "new" %}selected{% endif %}>new</option>
+              <option value="in_progress" {% if o.status == "in_progress" %}selected{% endif %}>in_progress</option>
+              <option value="done" {% if o.status == "done" %}selected{% endif %}>done</option>
+              <option value="canceled" {% if o.status == "canceled" %}selected{% endif %}>canceled</option>
+            </select>
+            <button type="submit" class="btn-ghost">Save</button>
+          </form>
+        </td>
           <td>{{ o.price|money }}</td>
           <td>{{ (paid_map.get(o.id, 0))|money }}</td>
           <td>{{ (o.price - paid_map.get(o.id, 0))|money }}</td>

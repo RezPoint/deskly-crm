@@ -1,20 +1,21 @@
-# DesklyCRM
+﻿# DesklyCRM
 
 [![CI](https://github.com/RezPoint/deskly-crm/actions/workflows/ci.yml/badge.svg)](https://github.com/RezPoint/deskly-crm/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml/badge.svg)](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/RezPoint/deskly-crm)](https://github.com/RezPoint/deskly-crm/releases)
 
-DesklyCRM is a lightweight client & order manager for freelancers and small businesses — track requests, statuses, payments, and export reports in CSV.
+DesklyCRM is a lightweight client & order manager for freelancers and small businesses вЂ” track requests, statuses, payments, and export reports in CSV.
 
 ## Why DesklyCRM
-Keep your client work in one place: who requested what, what’s in progress, what’s paid, and what’s done — without heavy CRMs.
+Keep your client work in one place: who requested what, whatвЂ™s in progress, whatвЂ™s paid, and whatвЂ™s done вЂ” without heavy CRMs.
 
 ## Features (MVP)
-- **Clients directory** — contacts, notes, quick lookup
-- **Orders tracking** — title, price, comments, linked client
-- **Status workflow** — `new` / `in_progress` / `done` / `canceled`
-- **Payments** — `paid` / `unpaid` (optional field for MVP)
-- **CSV export** — download orders as a report
+- **Clients directory** вЂ” contacts, notes, quick lookup
+- **Orders tracking** вЂ” title, price, comments, linked client
+- **Status workflow** вЂ” `new` / `in_progress` / `done` / `canceled`
+- **Payments** вЂ” `paid` / `unpaid` (optional field for MVP)
+- **CSV export** вЂ” download orders as a report
+- **UI polish** — fast status edits, better empty states, validation hints
 
 ## Tech Stack
 - **Backend:** FastAPI (Python)
@@ -32,6 +33,7 @@ uvicorn app.main:app --reload
 Open in your browser: http://127.0.0.1:8000
 Health: http://127.0.0.1:8000/health
 Metrics: http://127.0.0.1:8000/metrics
+UI: http://127.0.0.1:8000/ui/clients
 
 ## Docker (Recommended)
 ```bash
@@ -41,6 +43,7 @@ docker compose up --build
 Open in your browser: http://127.0.0.1:8000
 Health: http://127.0.0.1:8000/health
 Metrics: http://127.0.0.1:8000/metrics
+UI: http://127.0.0.1:8000/ui/clients
 
 ## PostgreSQL (Local)
 Set `DATABASE_URL` to use Postgres:
@@ -99,16 +102,16 @@ deskly-crm/
 ```
 
 ## Roadmap
-	•v0.1 — clients + orders + statuses + CSV export
-	•v0.2 — authentication + user accounts
-	•v0.3 — reminders, filters, activity log
-	•v1.0 — deploy guide + stable UI
+	вЂўv0.1 вЂ” clients + orders + statuses + CSV export
+	вЂўv0.2 вЂ” authentication + user accounts
+	вЂўv0.3 вЂ” reminders, filters, activity log
+	вЂўv1.0 вЂ” deploy guide + stable UI
 
 Contributing
 
-Issues and pull requests are welcome. For major changes, please open an issue first to discuss what you’d like to add.
+Issues and pull requests are welcome. For major changes, please open an issue first to discuss what youвЂ™d like to add.
 
 License
 
-MIT License — see LICENSE.
+MIT License вЂ” see LICENSE.
 
