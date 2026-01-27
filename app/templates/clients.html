@@ -9,6 +9,7 @@
 {% endif %}
 
 <div class="card">
+  <h3>Filters</h3>
   <form method="get" action="/ui/clients" class="row">
     <input name="q" placeholder="Search name/phone/telegram" value="{{ q }}" aria-label="Search clients" />
     <select name="sort">
@@ -26,7 +27,7 @@
 </div>
 
 <div class="card" id="add-client">
-  <h3>Add client</h3>
+  <h3>➕ Add client</h3>
   <form method="post" action="/ui/clients" class="row">
     <input name="name" placeholder="Name *" value="{{ form_name }}" required autofocus />
     <input name="phone" placeholder="Phone (+7 999 000-00-00)" value="{{ form_phone }}" type="tel" pattern="^[+\\d\\s()\\-]{3,25}$" title="Digits, spaces, +, -, parentheses (3-25 chars)" />
@@ -38,7 +39,7 @@
 </div>
 
 <div class="card">
-  <h3>List</h3>
+  <h3>📒 List</h3>
   {% if clients|length == 0 %}
     <p class="muted">No clients yet. Add your first client to start tracking orders.</p>
     <div class="row">
