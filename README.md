@@ -83,6 +83,17 @@ Endpoints:
 - Login via `/login` (web) or `POST /api/auth/login` (API).
 - To add users, go to `/ui/users` as owner/admin.
 
+API examples:
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"owner@example.com\",\"password\":\"secret123\"}"
+
+curl -X POST http://127.0.0.1:8000/api/users \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"user@example.com\",\"password\":\"secret123\",\"role\":\"viewer\"}"
+```
+
 ## Development
 ```bash
 python -m pytest -q
