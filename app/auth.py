@@ -50,3 +50,8 @@ def get_current_user(request: Request, db: Session) -> User:
 
 def has_users(db: Session) -> bool:
     return db.execute(select(User.id)).first() is not None
+
+
+def require_role(user: User, allowed: set[str]) -> None:
+    if user.role not in allowed:
+        raise HTTPException(status_code=403, detail="forbidden")
