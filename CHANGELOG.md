@@ -33,7 +33,6 @@
 
 ### Fixed
 - Invite migration idempotency for existing tables.
-
 ## [0.3.0] - 2026-01-27
 ### Added
 - Tenants table and workspace setup flow.

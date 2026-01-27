@@ -129,8 +129,6 @@ class InviteOut(APIModel):
     created_at: datetime
     expires_at: datetime
     accepted_at: Optional[datetime] = None
-
-
 class LoginIn(APIModel):
     email: str
     password: str
