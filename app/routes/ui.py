@@ -762,9 +762,46 @@ def ui_activity(
     request: Request,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    user_id: Optional[int] = Query(None),
+    entity_type: Optional[str] = Query(None),
+    action: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     stmt = select(ActivityLog).order_by(ActivityLog.id.desc())
+    if user_id:
+        stmt = stmt.where(ActivityLog.user_id == user_id)
+    if entity_type:
+        stmt = stmt.where(ActivityLog.entity_type == entity_type)
+    if action:
+        stmt = stmt.where(ActivityLog.action == action)
+    start_dt = _parse_date(date_from, "date_from", is_end=False)
+    end_dt = _parse_date(date_to, "date_to", is_end=True)
+    if start_dt and end_dt and start_dt > end_dt:
+        return templates.TemplateResponse(
+            request,
+            "activity.html",
+            {
+                "request": request,
+                "logs": [],
+                "filter_user_id": user_id or "",
+                "filter_entity_type": entity_type or "",
+                "filter_action": action or "",
+                "filter_date_from": date_from or "",
+                "filter_date_to": date_to or "",
+                "page": 1,
+                "total_pages": 1,
+                "limit": limit,
+                "offset": offset,
+                "error": "date_from must be <= date_to",
+            },
+            status_code=422,
+        )
+    if start_dt:
+        stmt = stmt.where(ActivityLog.created_at >= start_dt)
+    if end_dt:
+        stmt = stmt.where(ActivityLog.created_at <= end_dt)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     logs = db.execute(stmt.limit(limit).offset(offset)).scalars().all()
     page = (offset // limit) + 1
@@ -775,11 +812,11 @@ def ui_activity(
         {
             "request": request,
             "logs": logs,
-            "filter_user_id": "",
-            "filter_entity_type": "",
-            "filter_action": "",
-            "filter_date_from": "",
-            "filter_date_to": "",
+            "filter_user_id": user_id or "",
+            "filter_entity_type": entity_type or "",
+            "filter_action": action or "",
+            "filter_date_from": date_from or "",
+            "filter_date_to": date_to or "",
             "page": page,
             "total_pages": total_pages,
             "limit": limit,

@@ -59,3 +59,11 @@ def test_setup_hidden_after_user_created(anon_client):
     r = anon_client.get("/setup", follow_redirects=False)
     assert r.status_code in {302, 303}
     assert r.headers["location"] == "/login"
+
+
+def test_activity_ui_filters_and_validation(client):
+    r = client.get("/ui/activity", params={"entity_type": "client"})
+    assert r.status_code == 200
+
+    r = client.get("/ui/activity", params={"date_from": "2026-01-02", "date_to": "2026-01-01"})
+    assert r.status_code == 422
