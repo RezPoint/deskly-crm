@@ -33,6 +33,7 @@
     nav .brand { font-weight: 700; letter-spacing: 0.2px; margin-right: auto; color: var(--ink); }
     nav a { padding: 6px 10px; border-radius: 999px; background: var(--accent-2); color: var(--accent); font-weight: 600; }
     nav a.active { background: var(--accent); color: #fff; }
+    nav form { margin: 0; }
     .card {
       border: 1px solid var(--line);
       border-radius: 16px;
@@ -119,6 +120,17 @@
     <a href="/ui/clients" class="{% if path.startswith('/ui/clients') %}active{% endif %}">Clients</a>
     <a href="/ui/orders" class="{% if path.startswith('/ui/orders') %}active{% endif %}">Orders</a>
     <a href="/docs">Swagger</a>
+    {% if request and request.state and request.state.user and request.state.user.role != "viewer" %}
+      <a href="/ui/users" class="{% if path.startswith('/ui/users') %}active{% endif %}">Users</a>
+    {% endif %}
+    {% if request and request.state and request.state.user %}
+      <span class="muted">{{ request.state.user.email }} · {{ request.state.user.role }}</span>
+      <form method="post" action="/logout" class="inline">
+        <button type="submit" class="btn-ghost">Logout</button>
+      </form>
+    {% else %}
+      <a href="/login">Login</a>
+    {% endif %}
   </nav>
 
   {% if error %}

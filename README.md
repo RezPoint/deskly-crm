@@ -4,18 +4,18 @@
 [![CodeQL](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml/badge.svg)](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/RezPoint/deskly-crm)](https://github.com/RezPoint/deskly-crm/releases)
 
-DesklyCRM is a lightweight client & order manager for freelancers and small businesses вЂ” track requests, statuses, payments, and export reports in CSV.
+DesklyCRM is a lightweight client & order manager for freelancers and small businesses - track requests, statuses, payments, and export reports in CSV.
 
 ## Why DesklyCRM
-Keep your client work in one place: who requested what, whatвЂ™s in progress, whatвЂ™s paid, and whatвЂ™s done вЂ” without heavy CRMs.
+Keep your client work in one place: who requested what, whats in progress, whats paid, and whats done - without heavy CRMs.
 
 ## Features (MVP)
-- **Clients directory** вЂ” contacts, notes, quick lookup
-- **Orders tracking** вЂ” title, price, comments, linked client
-- **Status workflow** вЂ” `new` / `in_progress` / `done` / `canceled`
-- **Payments** вЂ” `paid` / `unpaid` (optional field for MVP)
-- **CSV export** вЂ” download orders as a report
-- **UI polish** — fast status edits, better empty states, validation hints
+- **Clients directory** - contacts, notes, quick lookup
+- **Orders tracking** - title, price, comments, linked client
+- **Status workflow** - `new` / `in_progress` / `done` / `canceled`
+- **Payments** - `paid` / `unpaid` (optional field for MVP)
+- **CSV export** - download orders as a report
+- **UI polish** - fast status edits, better empty states, validation hints
 
 ## Tech Stack
 - **Backend:** FastAPI (Python)
@@ -70,10 +70,29 @@ You can also run migrations on startup by setting `MIGRATE_ON_START=1`.
 Environment variables:
 - `LOG_LEVEL` (default: `INFO`)
 - `APP_VERSION` (default: `0.0.0`)
+- `JWT_SECRET` (default: `dev-secret-change-me`)
+- `JWT_EXPIRE_MINUTES` (default: `1440`)
 
 Endpoints:
 - `GET /health` returns `status`, `service`, `version`, `db`, `uptime_seconds`
 - `GET /metrics` exposes Prometheus metrics
+
+## Auth (0.2)
+- First run: open `/setup` to create the owner account.
+- `/setup` is available only when there are no users yet.
+- Login via `/login` (web) or `POST /api/auth/login` (API).
+- To add users, go to `/ui/users` as owner/admin.
+
+API examples:
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"owner@example.com\",\"password\":\"secret123\"}"
+
+curl -X POST http://127.0.0.1:8000/api/users \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"user@example.com\",\"password\":\"secret123\",\"role\":\"viewer\"}"
+```
 
 ## Development
 ```bash
@@ -102,16 +121,15 @@ deskly-crm/
 ```
 
 ## Roadmap
-	вЂўv0.1 вЂ” clients + orders + statuses + CSV export
-	вЂўv0.2 вЂ” authentication + user accounts
-	вЂўv0.3 вЂ” reminders, filters, activity log
-	вЂўv1.0 вЂ” deploy guide + stable UI
+- v0.1 - clients + orders + statuses + CSV export
+- v0.2 - authentication + user accounts
+- v0.3 - reminders, filters, activity log
+- v1.0 - deploy guide + stable UI
 
-Contributing
+## Contributing
 
-Issues and pull requests are welcome. For major changes, please open an issue first to discuss what youвЂ™d like to add.
+Issues and pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to add.
 
-License
+## License
 
-MIT License вЂ” see LICENSE.
-
+MIT License - see LICENSE.
