@@ -39,6 +39,18 @@ Open in your browser:
 Health: http://127.0.0.1:8000/health
 Metrics: http://127.0.0.1:8000/metrics
 
+## Environment
+Copy `.env.example` to `.env` and adjust values as needed.
+
+Main variables:
+- `DATABASE_URL` (defaults to SQLite)
+- `JWT_SECRET`
+- `JWT_EXPIRE_MINUTES`
+- `LOG_LEVEL`
+- `APP_VERSION`
+- `MIGRATE_ON_START` (set to `1` to run migrations on startup)
+- `AUTO_CREATE_DB` (set to `0` when using migrations in production)
+
 ## Docker (Recommended)
 ```bash
 docker compose up --build
@@ -51,6 +63,13 @@ UI: http://127.0.0.1:8000/ui/clients
 
 ## PostgreSQL (Local)
 Set `DATABASE_URL` to use Postgres:
+
+PowerShell:
+```bash
+$env:DATABASE_URL="postgresql+psycopg://deskly:deskly@localhost:5432/desklycrm"
+```
+
+Command Prompt:
 ```bash
 set DATABASE_URL=postgresql+psycopg://deskly:deskly@localhost:5432/desklycrm
 ```
