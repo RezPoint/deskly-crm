@@ -46,27 +46,35 @@
   {% else %}
     <table>
       <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Phone</th>
-          <th>Telegram</th>
-          <th>Created</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for c in clients %}
-        <tr>
-          <td>{{ c.id }}</td>
-          <td>{{ c.name }}</td>
-          <td>{{ c.phone or "" }}</td>
-          <td>{{ c.telegram or "" }}</td>
-          <td class="muted">{{ c.created_at|dt }}</td>
-          <td class="actions">
-            <form method="post" action="/ui/clients/{{ c.id }}/delete" class="inline" data-confirm="Delete client and all related orders/payments?">
-              <button type="submit" class="danger">Delete</button>
-            </form>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Contacts</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for c in clients %}
+      <tr>
+        <td>{{ c.id }}</td>
+        <td>{{ c.name }}</td>
+        <td>
+          {% if c.phone %}
+            <span class="tag">📞 {{ c.phone }}</span>
+          {% endif %}
+          {% if c.telegram %}
+            <span class="tag">✈️ {{ c.telegram }}</span>
+          {% endif %}
+          {% if not c.phone and not c.telegram %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ c.created_at|dt }}</td>
+        <td class="actions">
+          <form method="post" action="/ui/clients/{{ c.id }}/delete" class="inline" data-confirm="Delete client and all related orders/payments?">
+            <button type="submit" class="danger">Delete</button>
+          </form>
           </td>
         </tr>
       {% endfor %}
