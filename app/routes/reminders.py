@@ -131,6 +131,8 @@ def ui_create_reminder(
     request: Request,
     title: str = Form(""),
     due_at: str = Form(""),
+    entity_type: Optional[str] = Form(None),
+    entity_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
@@ -141,7 +143,15 @@ def ui_create_reminder(
         due_dt = datetime.fromisoformat(due_at)
     except Exception:
         due_dt = datetime.utcnow()
-    r = Reminder(title=title_clean, due_at=due_dt, status="open")
+    entity_type_clean = (entity_type or "").strip() or None
+    entity_id_clean = int(entity_id) if (entity_id and entity_id.isdigit()) else None
+    r = Reminder(
+        title=title_clean,
+        due_at=due_dt,
+        status="open",
+        entity_type=entity_type_clean,
+        entity_id=entity_id_clean,
+    )
     db.add(r)
     db.commit()
     db.refresh(r)

@@ -39,3 +39,12 @@ def test_reminder_entity_filters(client):
     r = client.get("/api/reminders", params={"entity_type": "order", "entity_id": 123})
     assert r.status_code == 200
     assert any(rem["id"] == reminder_id for rem in r.json())
+
+
+def test_ui_reminder_with_entity(client):
+    r = client.post(
+        "/api/reminders/ui",
+        data={"title": "UI Link", "due_at": "2026-01-30T10:00", "entity_type": "client", "entity_id": "5"},
+        follow_redirects=False,
+    )
+    assert r.status_code in {302, 303}
