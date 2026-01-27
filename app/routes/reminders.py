@@ -24,6 +24,7 @@ def list_reminders(
     request: Request,
     status: Optional[ReminderStatus] = None,
     overdue: Optional[bool] = None,
+    today: Optional[bool] = None,
     entity_type: Optional[str] = Query(None),
     entity_id: Optional[int] = Query(None, ge=1),
     limit: int = Query(100, ge=1, le=500),
@@ -37,6 +38,11 @@ def list_reminders(
     if overdue is True:
         stmt = stmt.where(Reminder.status == ReminderStatus.open.value)
         stmt = stmt.where(Reminder.due_at < datetime.utcnow())
+    if today is True:
+        start = datetime.utcnow().date()
+        end = datetime.combine(start, datetime.max.time())
+        stmt = stmt.where(Reminder.due_at >= datetime.combine(start, datetime.min.time()))
+        stmt = stmt.where(Reminder.due_at <= end)
     if entity_type:
         stmt = stmt.where(Reminder.entity_type == entity_type)
     if entity_id:
@@ -97,6 +103,7 @@ def ui_reminders(
     request: Request,
     status: Optional[str] = Query(None),
     overdue: Optional[str] = Query(None),
+    today: Optional[str] = Query(None),
     entity_type: Optional[str] = Query(None),
     entity_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
@@ -108,6 +115,11 @@ def ui_reminders(
     if overdue == "1":
         stmt = stmt.where(Reminder.status == "open")
         stmt = stmt.where(Reminder.due_at < datetime.utcnow())
+    if today == "1":
+        start = datetime.utcnow().date()
+        end = datetime.combine(start, datetime.max.time())
+        stmt = stmt.where(Reminder.due_at >= datetime.combine(start, datetime.min.time()))
+        stmt = stmt.where(Reminder.due_at <= end)
     if entity_type:
         stmt = stmt.where(Reminder.entity_type == entity_type)
     if entity_id:
@@ -127,6 +139,7 @@ def ui_reminders(
             "reminders": reminders,
             "filter_status": status or "",
             "filter_overdue": overdue or "",
+            "filter_today": today or "",
             "filter_entity_type": entity_type or "",
             "filter_entity_id": entity_id or "",
             "open_count": len(open_count),
@@ -166,6 +179,27 @@ def ui_create_reminder(
     db.refresh(r)
     user = getattr(request.state, "user", None)
     log_activity(db, getattr(user, "id", None), "reminder.created", "reminder", r.id, r.title)
+    return RedirectResponse(url="/ui/reminders", status_code=303)
+
+
+@router.post("/ui/mark-all-done", response_class=RedirectResponse)
+def ui_mark_all_done(
+    request: Request,
+    scope: str = Form("open"),
+    db: Session = Depends(get_db),
+):
+    get_current_user(request, db)
+    stmt = select(Reminder).where(Reminder.status == "open")
+    if scope == "overdue":
+        stmt = stmt.where(Reminder.due_at < datetime.utcnow())
+    reminders = db.execute(stmt).scalars().all()
+    for r in reminders:
+        r.status = "done"
+    db.commit()
+    user = getattr(request.state, "user", None)
+    if user:
+        for r in reminders:
+            log_activity(db, getattr(user, "id", None), "reminder.status_updated", "reminder", r.id, "done")
     return RedirectResponse(url="/ui/reminders", status_code=303)
 
 

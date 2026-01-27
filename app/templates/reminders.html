@@ -16,6 +16,10 @@
       <option value="">All</option>
       <option value="1" {% if filter_overdue == "1" %}selected{% endif %}>overdue only</option>
     </select>
+    <select name="today">
+      <option value="">All</option>
+      <option value="1" {% if filter_today == "1" %}selected{% endif %}>due today</option>
+    </select>
     <input name="entity_type" placeholder="Entity (order/client)" value="{{ filter_entity_type }}" />
     <input name="entity_id" placeholder="Entity ID" value="{{ filter_entity_id }}" />
     <button type="submit">Apply</button>
@@ -24,6 +28,18 @@
   <div class="row">
     <span class="stat">Open {{ open_count }}</span>
     <span class="stat">Overdue {{ overdue_count }}</span>
+    <a class="muted" href="/ui/reminders?today=1">Today</a>
+    <a class="muted" href="/ui/reminders?overdue=1">Overdue</a>
+    {% if request.state.user and request.state.user.role != "viewer" %}
+      <form method="post" action="/api/reminders/ui/mark-all-done" class="inline">
+        <input type="hidden" name="scope" value="open" />
+        <button type="submit" class="btn-ghost">Mark all done</button>
+      </form>
+      <form method="post" action="/api/reminders/ui/mark-all-done" class="inline">
+        <input type="hidden" name="scope" value="overdue" />
+        <button type="submit" class="btn-ghost">Mark overdue done</button>
+      </form>
+    {% endif %}
   </div>
 </div>
 
@@ -67,7 +83,13 @@
           <td class="muted">{{ r.due_at|dt }}</td>
           <td class="muted">
             {% if r.entity_type and r.entity_id %}
-              {{ r.entity_type }} #{{ r.entity_id }}
+              {% if r.entity_type == "order" %}
+                <a href="/ui/orders/{{ r.entity_id }}">order #{{ r.entity_id }}</a>
+              {% elif r.entity_type == "client" %}
+                <a href="/ui/clients?q={{ r.entity_id }}">client #{{ r.entity_id }}</a>
+              {% else %}
+                {{ r.entity_type }} #{{ r.entity_id }}
+              {% endif %}
             {% else %}
               -
             {% endif %}

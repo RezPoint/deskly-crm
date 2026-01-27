@@ -38,7 +38,21 @@
         <tr>
           <td>{{ l.id }}</td>
           <td>{{ l.action }}</td>
-          <td>{{ l.entity_type }}{% if l.entity_id %} #{{ l.entity_id }}{% endif %}</td>
+          <td>
+            {% if l.entity_type and l.entity_id %}
+              {% if l.entity_type == "order" %}
+                <a href="/ui/orders/{{ l.entity_id }}">order #{{ l.entity_id }}</a>
+              {% elif l.entity_type == "client" %}
+                <a href="/ui/clients?q={{ l.entity_id }}">client #{{ l.entity_id }}</a>
+              {% elif l.entity_type == "reminder" %}
+                <a href="/ui/reminders?entity_type=reminder&entity_id={{ l.entity_id }}">reminder #{{ l.entity_id }}</a>
+              {% else %}
+                {{ l.entity_type }} #{{ l.entity_id }}
+              {% endif %}
+            {% else %}
+              -
+            {% endif %}
+          </td>
           <td>{{ l.user_id or "-" }}</td>
           <td class="muted">{{ l.message or "" }}</td>
           <td class="muted">{{ l.created_at|dt }}</td>
