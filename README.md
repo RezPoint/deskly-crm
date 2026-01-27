@@ -112,12 +112,18 @@ API endpoints:
 - `POST /api/import/orders` (multipart file `file`)
   - Columns: `client_id` (required), `title` (required), `price` (required), `status` (optional), `comment`
  HEAD
+ origin/main
 Optional query params:
 - `dry_run=true` to validate without saving
 
 CSV templates:
 - `GET /api/export/templates/clients.csv`
 - `GET /api/export/templates/orders.csv`
+ HEAD
+
+
+UI:
+- `/ui/import` upload CSV files with preview and dry-run
  origin/main
 
 ## Auth (0.2)
