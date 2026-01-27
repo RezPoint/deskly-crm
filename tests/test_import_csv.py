@@ -34,3 +34,17 @@ def test_import_clients_dry_run(client):
     r = client.get("/api/clients", params={"q": "Dry"})
     assert r.status_code == 200
     assert all(c["name"] != "Dry" for c in r.json())
+
+
+def test_import_clients_duplicate_phone_in_csv(client):
+    csv = "name,phone,telegram,notes\nA,+123,,\nB,+123,,\n"
+    r = client.post("/api/import/clients", files=_csv_file(csv))
+    assert r.status_code == 422
+
+
+def test_import_clients_duplicate_phone_in_db(client):
+    r = client.post("/api/clients", json={"name": "Existing", "phone": "+123"})
+    assert r.status_code == 200
+    csv = "name,phone,telegram,notes\nA,+123,,\n"
+    r = client.post("/api/import/clients", files=_csv_file(csv))
+    assert r.status_code == 422

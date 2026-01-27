@@ -3,6 +3,7 @@ from typing import Optional
 
 _PHONE_ALLOWED = re.compile(r"^[+\d\s()\-]{3,25}$")
 _TELEGRAM_ALLOWED = re.compile(r"^[A-Za-z0-9_]{5,32}$")
+_EMAIL_ALLOWED = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def validate_phone(value: Optional[str]) -> Optional[str]:
@@ -30,3 +31,14 @@ def validate_telegram(value: Optional[str]) -> Optional[str]:
     if not _TELEGRAM_ALLOWED.match(handle):
         raise ValueError("telegram must be 5-32 chars: letters, numbers, underscore")
     return f"@{handle}"
+
+
+def validate_email(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    email = value.strip().lower()
+    if not email:
+        return None
+    if not _EMAIL_ALLOWED.match(email):
+        raise ValueError("email must be a valid address")
+    return email
