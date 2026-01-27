@@ -21,3 +21,11 @@ def client(tmp_path):
 
         c.post("/api/auth/login", json={"email": "owner@example.com", "password": "secret123"})
         yield c
+
+
+@pytest.fixture()
+def anon_client(tmp_path):
+    db_path = tmp_path / "test_anon.db"
+    app = create_app(f"sqlite:///{db_path}")
+    with TestClient(app) as c:
+        yield c

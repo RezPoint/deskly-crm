@@ -80,6 +80,7 @@ Endpoints:
 ## Auth (0.2)
 - First run: open `/setup` to create the owner account.
 - Login via `/login` (web) or `POST /api/auth/login` (API).
+ - To add users, go to `/ui/users` as owner/admin.
 
 ## Development
 ```bash
