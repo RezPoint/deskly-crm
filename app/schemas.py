@@ -81,12 +81,14 @@ class OrderSummaryOut(APIModel):
 class PaymentCreate(APIModel):
     order_id: int = Field(..., ge=1)
     amount: Money = Field(..., gt=Decimal("0.00"))
+    note: Optional[str] = Field(None, max_length=500)
 
 
 class PaymentOut(APIModel):
     id: int
     order_id: int
     amount: Money
+    note: Optional[str]
     created_at: datetime
 
 

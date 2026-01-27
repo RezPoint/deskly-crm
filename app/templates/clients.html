@@ -11,21 +11,29 @@
 <div class="card">
   <div class="section-head">
     <h3>Filters</h3>
-    <div class="actions">
-      <a href="/api/export/clients.csv">Export CSV</a>
-      <a class="link-muted" href="/ui/clients">Reset</a>
-    </div>
   </div>
-  <form method="get" action="/ui/clients" class="row">
-    <input name="q" placeholder="Search name/phone/telegram" value="{{ q }}" aria-label="Search clients" />
-    <select name="sort">
+  <form method="get" action="/ui/clients" class="row filters-row" autocomplete="off">
+    <div class="autocomplete field-grow">
+      <input id="client-search" name="q" placeholder="Search name/phone/telegram" value="{{ q }}" aria-label="Search clients" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" readonly />
+      <div class="autocomplete-list" id="client-suggestions" aria-label="Suggestions" role="listbox"></div>
+    </div>
+    <select class="field-narrow" name="sort">
       <option value="created_desc" {% if filter_sort == "created_desc" %}selected{% endif %}>Newest</option>
       <option value="created_asc" {% if filter_sort == "created_asc" %}selected{% endif %}>Oldest</option>
       <option value="name_asc" {% if filter_sort == "name_asc" %}selected{% endif %}>Name A->Z</option>
       <option value="name_desc" {% if filter_sort == "name_desc" %}selected{% endif %}>Name Z->A</option>
     </select>
     <button type="submit">Search</button>
+    {% if q or (filter_sort and filter_sort != "created_desc") %}
+      <a class="btn-ghost" href="/ui/clients">Reset</a>
+    {% endif %}
   </form>
+  {% if clients|length > 0 %}
+    <div class="actions" style="margin-top: 10px;">
+      <a id="export-selected-csv" class="btn-ghost" href="/api/export/clients.csv" style="display:none;">Export selected CSV</a>
+      <a id="export-selected-xlsx" class="btn-ghost" href="/api/export/clients.xlsx" style="display:none;">Export selected XLSX</a>
+    </div>
+  {% endif %}
 </div>
 
 <div class="card" id="add-client">
@@ -47,8 +55,10 @@
 <div class="card">
   <div class="section-head">
     <h3>List</h3>
-    <div class="actions">
-      <span class="muted">Total: {{ clients|length }}</span>
+  </div>
+  <div class="summary-bar">
+    <div class="stats">
+      <span class="stat">Total {{ clients|length }}</span>
     </div>
   </div>
   {% if clients|length == 0 %}
@@ -60,16 +70,18 @@
     <table>
       <thead>
       <tr>
+        <th><input type="checkbox" id="select-all" aria-label="Select all clients" /></th>
         <th>ID</th>
         <th>Name</th>
         <th>Contacts</th>
         <th>Created</th>
-        <th></th>
+        <th class="actions">Actions</th>
       </tr>
     </thead>
     <tbody>
     {% for c in clients %}
       <tr>
+        <td><input type="checkbox" class="client-select" data-client-id="{{ c.id }}" aria-label="Select client {{ c.id }}" /></td>
         <td>{{ c.id }}</td>
         <td>{{ c.name }}</td>
         <td>
@@ -106,4 +118,137 @@
     </div>
   {% endif %}
 </div>
+
+<div id="client-suggestions-data" style="display:none;">
+  {% for c in clients %}
+    <span data-value="{{ c.name }}"></span>
+    {% if c.phone %}<span data-value="{{ c.phone }}"></span>{% endif %}
+    {% if c.telegram %}<span data-value="{{ c.telegram }}"></span>{% endif %}
+  {% endfor %}
+</div>
+
+<script>
+  (function () {
+    const searchInput = document.getElementById("client-search");
+    if (searchInput) {
+      const safeName = "search-" + Math.random().toString(36).slice(2);
+      searchInput.setAttribute("name", safeName);
+      searchInput.setAttribute("data-name", "q");
+      searchInput.setAttribute("autocomplete", "off");
+      searchInput.addEventListener("focus", () => {
+        if (searchInput.hasAttribute("readonly")) {
+          searchInput.removeAttribute("readonly");
+        }
+      });
+    }
+    const form = searchInput ? searchInput.closest("form") : null;
+    if (form && !form.querySelector('input[type="hidden"][name="q"]')) {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = "q";
+      hidden.value = searchInput ? searchInput.value : "";
+      form.appendChild(hidden);
+      if (searchInput) {
+        searchInput.addEventListener("input", () => {
+          hidden.value = searchInput.value;
+        });
+      }
+    }
+    const selectAll = document.getElementById("select-all");
+    const items = Array.from(document.querySelectorAll(".client-select"));
+    const exportCsv = document.getElementById("export-selected-csv");
+    const exportXlsx = document.getElementById("export-selected-xlsx");
+    if (!selectAll || !exportCsv || !exportXlsx || items.length === 0) return;
+
+    const updateExport = () => {
+      const selected = items.filter((item) => item.checked).map((item) => item.dataset.clientId);
+      if (selected.length > 0) {
+        exportCsv.style.display = "inline-flex";
+        exportXlsx.style.display = "inline-flex";
+        exportCsv.href = `/api/export/clients.csv?ids=${selected.join(",")}`;
+        exportXlsx.href = `/api/export/clients.xlsx?ids=${selected.join(",")}`;
+      } else {
+        exportCsv.style.display = "none";
+        exportXlsx.style.display = "none";
+        exportCsv.href = "/api/export/clients.csv";
+        exportXlsx.href = "/api/export/clients.xlsx";
+      }
+      selectAll.checked = selected.length === items.length && items.length > 0;
+      selectAll.indeterminate = selected.length > 0 && selected.length < items.length;
+    };
+
+    selectAll.addEventListener("change", () => {
+      items.forEach((item) => {
+        item.checked = selectAll.checked;
+      });
+      updateExport();
+    });
+
+    items.forEach((item) => {
+      item.addEventListener("change", updateExport);
+    });
+  })();
+</script>
+
+<script>
+  (function () {
+    const input = document.getElementById("client-search");
+    const list = document.getElementById("client-suggestions");
+    const dataRoot = document.getElementById("client-suggestions-data");
+    if (!input || !list || !dataRoot) return;
+
+    const values = Array.from(dataRoot.querySelectorAll("[data-value]"))
+      .map((el) => el.getAttribute("data-value"))
+      .filter((v) => v);
+    const unique = Array.from(new Set(values));
+
+    const render = (items) => {
+      list.innerHTML = "";
+      if (!items.length) {
+        list.style.display = "none";
+        return;
+      }
+      items.slice(0, 6).forEach((item) => {
+        const option = document.createElement("div");
+        option.className = "autocomplete-item";
+        option.textContent = item;
+        option.setAttribute("role", "option");
+        option.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          input.value = item;
+          list.style.display = "none";
+        });
+        list.appendChild(option);
+      });
+      list.style.display = "block";
+    };
+
+    const showAll = () => {
+      render(unique);
+    };
+
+    input.addEventListener("focus", showAll);
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) {
+        showAll();
+        return;
+      }
+      const matches = unique.filter((v) => v.toLowerCase().includes(q));
+      render(matches);
+    });
+
+    input.addEventListener("blur", () => {
+      setTimeout(() => {
+        list.style.display = "none";
+      }, 120);
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!list.contains(event.target) && event.target !== input) {
+        list.style.display = "none";
+      }
+    });
+  })();
+</script>
 {% endblock %}

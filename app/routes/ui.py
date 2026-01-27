@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, File
@@ -655,6 +655,7 @@ def ui_order_detail(
             "paid_total": paid_total,
             "balance": balance,
             "payment_amount": "",
+            "payment_note": "",
             "price_input": f"{price:.2f}",
             "error": "",
         },
@@ -666,6 +667,7 @@ def ui_add_payment(
     request: Request,
     order_id: int,
     amount: str = Form(...),
+    note: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     tenant_id = _get_tenant_id(request)
@@ -676,6 +678,10 @@ def ui_add_payment(
         raise HTTPException(status_code=404, detail="order not found")
 
     amount_dec = _to_decimal(amount, "amount")
+    note_value = note.strip() if note else ""
+    if len(note_value) > 500:
+        note_value = note_value[:500]
+
     if amount_dec <= Decimal("0.00"):
         payments = db.execute(
             select(Payment)
@@ -705,6 +711,7 @@ def ui_add_payment(
                 "paid_total": paid_total,
                 "balance": balance,
                 "payment_amount": amount,
+                "payment_note": note_value,
                 "price_input": f"{price:.2f}",
                 "error": "Amount must be > 0",
             },
@@ -742,14 +749,28 @@ def ui_add_payment(
                 "paid_total": paid_total,
                 "balance": balance,
                 "payment_amount": amount,
+                "payment_note": note_value,
                 "price_input": f"{price:.2f}",
                 "error": "Payment exceeds order price (overpay is not allowed).",
             },
             status_code=409,
         )
 
-    p = Payment(tenant_id=tenant_id, order_id=order_id, amount=amount_dec)
+    note_final = note_value or None
+    p = Payment(
+        tenant_id=tenant_id,
+        order_id=order_id,
+        amount=amount_dec,
+        note=note_final,
+    )
     db.add(p)
+    prev_status = order.status
+    new_paid_total = paid_total + amount_dec
+    if order.status != "canceled":
+        if new_paid_total >= price:
+            order.status = "done"
+        else:
+            order.status = "in_progress"
     db.commit()
     user = getattr(request.state, "user", None)
     log_activity(
@@ -761,8 +782,26 @@ def ui_add_payment(
         str(p.amount),
         tenant_id=tenant_id,
     )
+    if order.status != prev_status:
+        log_activity(
+            db,
+            getattr(user, "id", None),
+            "order.status_updated",
+            "order",
+            order_id,
+            order.status,
+            tenant_id=tenant_id,
+        )
 
-    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
+    referer = request.headers.get("referer")
+    target = "/ui/orders"
+    if referer:
+        parsed = urlparse(referer)
+        if parsed.path.startswith("/ui/orders"):
+            target = parsed.path
+            if parsed.query:
+                target = f"{target}?{parsed.query}"
+    return RedirectResponse(url=target, status_code=303)
 
 
 @router.post("/payments/{payment_id}/delete")
@@ -778,8 +817,30 @@ def ui_delete_payment(
     if payment is None:
         raise HTTPException(status_code=404, detail="payment not found")
     order_id = payment.order_id
+    amount = payment.amount
     db.delete(payment)
     db.commit()
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
+    status_changed = False
+    if order is not None:
+        paid_total_raw = db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.order_id == order_id, Payment.tenant_id == tenant_id
+            )
+        ).scalar_one()
+        paid_total = _as_decimal(paid_total_raw)
+        prev_status = order.status
+        if paid_total >= _as_decimal(order.price):
+            order.status = "done"
+        elif paid_total == Decimal("0.00"):
+            order.status = "new"
+        else:
+            order.status = "in_progress"
+        if order.status != prev_status:
+            status_changed = True
+            db.commit()
     user = getattr(request.state, "user", None)
     log_activity(
         db,
@@ -787,9 +848,19 @@ def ui_delete_payment(
         "payment.deleted",
         "payment",
         payment_id,
-        str(payment.amount),
+        str(amount),
         tenant_id=tenant_id,
     )
+    if order is not None and status_changed:
+        log_activity(
+            db,
+            getattr(user, "id", None),
+            "order.status_updated",
+            "order",
+            order_id,
+            order.status,
+            tenant_id=tenant_id,
+        )
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
 
@@ -798,6 +869,7 @@ def ui_update_order_status(
     request: Request,
     order_id: int,
     status: str = Form(...),
+    next: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     tenant_id = _get_tenant_id(request)
@@ -824,7 +896,20 @@ def ui_update_order_status(
         tenant_id=tenant_id,
     )
 
-    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
+    target = "/ui/orders"
+    if next and next.startswith("/ui/orders"):
+        target = next
+        return RedirectResponse(url=target, status_code=303)
+
+    referer = request.headers.get("referer")
+    if referer:
+        parsed = urlparse(referer)
+        if parsed.path.startswith("/ui/orders"):
+            target = parsed.path
+            if parsed.query:
+                target = f"{target}?{parsed.query}"
+
+    return RedirectResponse(url=target, status_code=303)
 
 
 @router.post("/orders/{order_id}/price")
@@ -913,7 +998,14 @@ def ui_update_order_price(
             status_code=409,
         )
 
+    prev_status = order.status
     order.price = new_price
+    if paid_total >= new_price:
+        order.status = "done"
+    elif paid_total == Decimal("0.00"):
+        order.status = "new"
+    else:
+        order.status = "in_progress"
     db.commit()
     user = getattr(request.state, "user", None)
     log_activity(
@@ -925,6 +1017,16 @@ def ui_update_order_price(
         str(new_price),
         tenant_id=tenant_id,
     )
+    if order.status != prev_status:
+        log_activity(
+            db,
+            getattr(user, "id", None),
+            "order.status_updated",
+            "order",
+            order_id,
+            order.status,
+            tenant_id=tenant_id,
+        )
 
     return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 

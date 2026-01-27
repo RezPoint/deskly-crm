@@ -4,6 +4,10 @@ dev:
 	pip install -r requirements.txt
 	PYTHONPATH=. DATABASE_URL=$(POSTGRES_URL) uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+dev-clean:
+	powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }"
+	$(MAKE) dev
+
 lint:
 	python -m compileall app
 

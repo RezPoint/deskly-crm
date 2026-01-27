@@ -21,11 +21,12 @@
       font-family: "IBM Plex Serif", "Georgia", serif;
       color: var(--ink);
       background: radial-gradient(1200px 600px at 20% -10%, #efe8da 0%, transparent 60%), var(--bg);
-      max-width: 1020px;
+      width: min(1020px, 100%);
       margin: 24px auto 60px;
+      margin-inline: auto;
       padding: 0 16px;
     }
-    h1 { font-size: 32px; margin: 12px 0 8px; }
+    h1 { font-size: 32px; margin: 14px 0 10px; }
     h3 { margin: 6px 0 10px; }
     a { text-decoration: none; color: var(--accent); }
     a:hover { text-decoration: underline; }
@@ -46,7 +47,7 @@
     .card {
       border: 1px solid var(--line);
       border-radius: 16px;
-      padding: 14px;
+      padding: 16px;
       margin: 14px 0;
       background: var(--card);
       box-shadow: var(--shadow);
@@ -55,6 +56,13 @@
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     .row.tight { gap: 6px; }
     .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .actions.stack { flex-direction: column; align-items: flex-end; gap: 6px; }
+    .push-right { margin-left: auto; }
+    .field-narrow { flex: 0 0 160px; }
+    .field-grow { flex: 1 1 260px; min-width: 220px; }
+    .field-amount { flex: 0 0 220px; min-width: 200px; }
+    .inline-form { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+    .stats-row { align-items: center; }
     input, select, textarea, button {
       padding: 10px 12px;
       border-radius: 12px;
@@ -76,8 +84,13 @@
     .danger:hover { filter: brightness(0.98); }
     .err { color: var(--danger); margin: 10px 0; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); }
+    th, td { text-align: left; padding: 10px; border-bottom: none; vertical-align: middle; }
+    thead th { border-bottom: 1px solid var(--line); }
+    tbody tr { border-bottom: 1px solid var(--line); }
     th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+    th.numeric, td.numeric { text-align: right; }
+    th.actions, td.actions { text-align: right; }
+    td.actions .row { justify-content: flex-end; }
     tbody tr:nth-child(even) { background: #fbfaf7; }
     tbody tr:hover { background: #f4f1ea; }
     .muted { color: var(--muted); }
@@ -94,6 +107,10 @@
     .pill.in_progress { background: #fff4e6; color: #a45b00; }
     .pill.done { background: #e8f7ee; color: #2f6f5e; }
     .pill.canceled { background: #ffeef0; color: #b00020; }
+    .status-select.new { background: #f0f7ff; color: #2a5d9f; border-color: #c6d9f5; }
+    .status-select.in_progress { background: #fff4e6; color: #a45b00; border-color: #f2d3a6; }
+    .status-select.done { background: #e8f7ee; color: #2f6f5e; border-color: #bfe3cf; }
+    .status-select.canceled { background: #ffeef0; color: #b00020; border-color: #f2b5bd; }
     .stat {
       display: inline-flex;
       align-items: center;
@@ -116,15 +133,68 @@
       font-size: 12px;
     }
     .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 12px;
       background: transparent;
       border: 1px solid var(--line);
       color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
     }
-    .btn-ghost:hover {
-      background: var(--accent-2);
-    }
+    .btn-ghost:hover { background: var(--accent-2); }
+    .btn-ghost.compact { padding: 6px 8px; font-size: 12px; }
     .link-muted { color: var(--muted); font-weight: 600; }
     .link-muted:hover { color: var(--ink); }
+    .summary-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin: 8px 0 6px;
+    }
+    .summary-bar .stats { display: flex; gap: 8px; flex-wrap: wrap; }
+    .status-cell { display: flex; flex-direction: column; gap: 6px; }
+    .overview > div { margin: 4px 0; }
+    .price-edit { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 8px; font-size: 12px; }
+    .price-edit .price-label { color: var(--muted); font-weight: 600; }
+    .price-edit .price-input { width: 110px; }
+    .overview-grid { display: grid; gap: 6px; }
+    .overview-row { display: grid; grid-template-columns: 90px 1fr; gap: 8px; align-items: center; }
+    .overview-label { color: var(--muted); font-weight: 600; }
+    .autocomplete { position: relative; display: block; flex: 1 1 260px; min-width: 220px; }
+    .autocomplete input { width: 100%; }
+    .filters-row { gap: 12px; }
+    .filters-row input { min-width: 240px; }
+    .filters-row select { min-width: 140px; }
+    .filters-row .autocomplete { flex: 0 0 360px; max-width: 360px; }
+    .filters-row .actions { flex-wrap: nowrap; }
+    .autocomplete-list {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      z-index: 10;
+      display: none;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .autocomplete-item {
+      padding: 8px 10px;
+      cursor: pointer;
+      font-family: "Inter", system-ui, sans-serif;
+    }
+    .autocomplete-item:hover {
+      background: var(--accent-2);
+    }
   </style>
 </head>
 <body>
@@ -170,6 +240,21 @@
       const message = form.getAttribute("data-confirm");
       if (message && !window.confirm(message)) {
         event.preventDefault();
+      }
+    });
+    document.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLSelectElement)) return;
+      if (target.classList.contains("status-select")) {
+        target.classList.remove("new", "in_progress", "done", "canceled");
+        if (target.value) {
+          target.classList.add(target.value);
+        }
+      }
+      if (target.dataset.autosubmit !== "true") return;
+      const form = target.closest("form");
+      if (form) {
+        form.submit();
       }
     });
   </script>

@@ -11,15 +11,49 @@
       <a class="link-muted" href="/ui/orders">Back to orders</a>
     </div>
   </div>
-  <div><b>Client:</b> {{ client.name if client else order.client_id }}</div>
-  <div><b>Title:</b> {{ order.title }}</div>
-  <div><b>Status:</b> <span class="pill {{ order.status }}">{{ order.status }}</span></div>
-  <div class="row">
-    <span class="stat">Price {{ order.price|money }}</span>
-    <span class="stat">Paid {{ paid_total|money }}</span>
-    <span class="stat">Due {{ balance|money }}</span>
+  <div class="overview-grid">
+    <div class="overview-row">
+      <span class="overview-label">Client</span>
+      <span>{{ client.name if client else order.client_id }}</span>
+    </div>
+    <div class="overview-row">
+      <span class="overview-label">Title</span>
+      <span>{{ order.title }}</span>
+    </div>
+    <div class="overview-row">
+      <span class="overview-label">Status</span>
+      {% if request.state.user and request.state.user.role != "viewer" %}
+        <form method="post" action="/ui/orders/{{ order.id }}/status" class="row tight compact">
+          <select name="status" data-autosubmit="true" aria-label="Status" class="status-select {{ order.status }}">
+            <option value="new" {% if order.status == "new" %}selected{% endif %}>New</option>
+            <option value="in_progress" {% if order.status == "in_progress" %}selected{% endif %}>In progress</option>
+            <option value="done" {% if order.status == "done" %}selected{% endif %}>Done</option>
+            <option value="canceled" {% if order.status == "canceled" %}selected{% endif %}>Canceled</option>
+          </select>
+        </form>
+      {% else %}
+        <span class="pill {{ order.status }}">{% if order.status == "in_progress" %}in progress{% else %}{{ order.status }}{% endif %}</span>
+      {% endif %}
+    </div>
   </div>
-  <div><b>Created:</b> {{ order.created_at|dt }}</div>
+  <div class="summary-bar">
+    <div class="stats">
+      <span class="stat">Price {{ order.price|money }}</span>
+      <span class="stat">Paid {{ paid_total|money }}</span>
+      <span class="stat">Due {{ balance|money }}</span>
+    </div>
+  </div>
+  {% if request.state.user and request.state.user.role != "viewer" %}
+    <form method="post" action="/ui/orders/{{ order.id }}/price" class="price-edit compact">
+      <span class="price-label">Update price</span>
+      <input class="price-input" name="price" value="{{ price_input }}" type="number" min="0" step="0.01" aria-label="Update price" />
+      <button type="submit" class="btn-ghost compact">Save</button>
+    </form>
+  {% endif %}
+  <div class="overview-row">
+    <span class="overview-label">Created</span>
+    <span>{{ order.created_at|dt }}</span>
+  </div>
 
   {% if order.comment %}
     <div class="muted"><b>Comment:</b> {{ order.comment }}</div>
@@ -31,33 +65,8 @@
     <p class="err"><b>{{ error }}</b></p>
   {% endif %}
 
-  <div class="section-head">
-    <h3>Update status</h3>
-  </div>
-  {% if request.state.user and request.state.user.role != "viewer" %}
-    <form method="post" action="/ui/orders/{{ order.id }}/status" class="row tight compact">
-      <select name="status" aria-label="Status">
-        <option value="new" {% if order.status == "new" %}selected{% endif %}>new</option>
-        <option value="in_progress" {% if order.status == "in_progress" %}selected{% endif %}>in_progress</option>
-        <option value="done" {% if order.status == "done" %}selected{% endif %}>done</option>
-        <option value="canceled" {% if order.status == "canceled" %}selected{% endif %}>canceled</option>
-      </select>
-      <button type="submit" class="btn-ghost">Save</button>
-    </form>
-  {% else %}
-    <p class="muted">Viewer role cannot update status.</p>
-  {% endif %}
-
-  <div class="section-head">
-    <h3>Update price</h3>
-  </div>
-  {% if request.state.user and request.state.user.role != "viewer" %}
-    <form method="post" action="/ui/orders/{{ order.id }}/price" class="row tight compact">
-      <input name="price" value="{{ price_input }}" type="number" min="0" step="0.01" aria-label="Price" />
-      <button type="submit" class="btn-ghost">Save</button>
-    </form>
-  {% else %}
-    <p class="muted">Viewer role cannot update price.</p>
+  {% if not (request.state.user and request.state.user.role != "viewer") %}
+    <p class="muted">Viewer role cannot update status or price.</p>
   {% endif %}
 </div>
 
@@ -67,7 +76,8 @@
   </div>
   {% if request.state.user and request.state.user.role != "viewer" %}
     <form method="post" action="/ui/orders/{{ order.id }}/payments" class="row">
-      <input name="amount" placeholder="Amount (e.g. 8000 or 8000.00)" value="{{ payment_amount }}" type="number" min="0.01" step="0.01" required aria-label="Payment amount" />
+      <input class="field-amount" name="amount" placeholder="Amount (e.g. 8000 or 8000.00)" value="{{ payment_amount }}" type="number" min="0.01" step="0.01" required aria-label="Payment amount" />
+      <input class="field-grow" name="note" placeholder="Note (what for)" value="{{ payment_note }}" maxlength="500" aria-label="Payment note" />
       <button type="submit">Add</button>
     </form>
     <p class="muted">Overpay is not allowed. Negative amounts are not supported.</p>
@@ -79,8 +89,10 @@
 <div class="card">
   <div class="section-head">
     <h3>Payments</h3>
-    <div class="actions">
-      <span class="muted">Total: {{ payments|length }}</span>
+  </div>
+  <div class="summary-bar">
+    <div class="stats">
+      <span class="stat">Total {{ payments|length }}</span>
     </div>
   </div>
   {% if payments|length == 0 %}
@@ -89,25 +101,27 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Amount</th>
+          <th>#</th>
+          <th class="numeric">Amount</th>
+          <th>Note</th>
           <th>Created</th>
-          <th></th>
+          <th class="actions">Actions</th>
         </tr>
       </thead>
       <tbody>
       {% for p in payments %}
         <tr>
-          <td>{{ p.id }}</td>
-          <td>{{ p.amount|money }}</td>
+          <td>{{ loop.index }}</td>
+          <td class="numeric">{{ p.amount|money }}</td>
+          <td class="muted">{{ p.note or "-" }}</td>
           <td class="muted">{{ p.created_at|dt }}</td>
-        <td class="actions">
-          <form method="post" action="/ui/payments/{{ p.id }}/delete" class="inline" data-confirm="Delete payment?">
-            {% if request.state.user and request.state.user.role != "viewer" %}
-              <button type="submit" class="danger">Delete</button>
-            {% endif %}
-          </form>
-        </td>
+          <td class="actions">
+            <form method="post" action="/ui/payments/{{ p.id }}/delete" class="inline" data-confirm="Delete payment?">
+              {% if request.state.user and request.state.user.role != "viewer" %}
+                <button type="submit" class="danger">Delete</button>
+              {% endif %}
+            </form>
+          </td>
         </tr>
       {% endfor %}
       </tbody>

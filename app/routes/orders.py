@@ -251,7 +251,14 @@ def update_order_price(order_id: int, payload: OrderPriceUpdate, request: Reques
     if payload.price < paid_total:
         raise HTTPException(status_code=409, detail="new price is below already paid total")
 
+    prev_status = order.status
     order.price = payload.price
+    if paid_total >= payload.price:
+        order.status = "done"
+    elif paid_total == Decimal("0.00"):
+        order.status = "new"
+    else:
+        order.status = "in_progress"
     db.commit()
     db.refresh(order)
     user = getattr(request.state, "user", None)
@@ -264,6 +271,16 @@ def update_order_price(order_id: int, payload: OrderPriceUpdate, request: Reques
         str(order.price),
         tenant_id=tenant_id,
     )
+    if order.status != prev_status:
+        log_activity(
+            db,
+            getattr(user, "id", None),
+            "order.status_updated",
+            "order",
+            order_id,
+            order.status,
+            tenant_id=tenant_id,
+        )
     return order
 
 

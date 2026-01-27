@@ -11,24 +11,28 @@
 <div class="card">
   <div class="section-head">
     <h3>Add user</h3>
+    <span class="muted">Owner/Admin can add users.</span>
   </div>
   <form method="post" action="/ui/users" class="row">
-    <input name="email" type="email" placeholder="Email" required />
-    <input name="password" type="password" placeholder="Password (min 6)" required />
-    <select name="role">
-      <option value="viewer">viewer</option>
-      <option value="admin">admin</option>
-      <option value="owner">owner</option>
+    <input class="field-grow" name="email" type="email" placeholder="Email" required />
+    <input class="field-narrow" name="password" type="password" placeholder="Temp password (min 6)" required />
+    <select class="field-narrow" name="role" aria-label="Role">
+      <option value="viewer">Viewer (read only)</option>
+      <option value="admin">Admin</option>
+      <option value="owner">Owner</option>
     </select>
     <button type="submit">Create</button>
   </form>
+  <p class="muted">Give the user a temporary password and ask them to change it after login.</p>
 </div>
 
 <div class="card">
   <div class="section-head">
     <h3>List</h3>
-    <div class="actions">
-      <span class="muted">Total: {{ users|length }}</span>
+  </div>
+  <div class="summary-bar">
+    <div class="stats">
+      <span class="stat">Total {{ users|length }}</span>
     </div>
   </div>
   <table>
@@ -38,7 +42,7 @@
         <th>Email</th>
         <th>Role</th>
         <th>Created</th>
-        <th></th>
+        <th class="actions">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -51,12 +55,11 @@
         <td class="actions">
           {% if request.state.user and request.state.user.role == "owner" %}
             <form method="post" action="/ui/users/{{ u.id }}/role" class="row tight compact">
-              <select name="role">
-                <option value="owner" {% if u.role == "owner" %}selected{% endif %}>owner</option>
-                <option value="admin" {% if u.role == "admin" %}selected{% endif %}>admin</option>
-                <option value="viewer" {% if u.role == "viewer" %}selected{% endif %}>viewer</option>
+              <select name="role" data-autosubmit="true" aria-label="Change role">
+                <option value="owner" {% if u.role == "owner" %}selected{% endif %}>Owner</option>
+                <option value="admin" {% if u.role == "admin" %}selected{% endif %}>Admin</option>
+                <option value="viewer" {% if u.role == "viewer" %}selected{% endif %}>Viewer</option>
               </select>
-              <button type="submit" class="btn-ghost">Save</button>
             </form>
           {% else %}
             <span class="muted">Role changes: owner only</span>

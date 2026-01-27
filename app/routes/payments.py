@@ -33,8 +33,20 @@ def create_payment(payload: PaymentCreate, request: Request, db: Session = Depen
     if paid_total + payload.amount > price:
         raise HTTPException(status_code=409, detail="payment exceeds order remaining balance")
 
-    p = Payment(tenant_id=tenant_id, order_id=payload.order_id, amount=payload.amount)
+    p = Payment(
+        tenant_id=tenant_id,
+        order_id=payload.order_id,
+        amount=payload.amount,
+        note=(payload.note.strip() if payload.note else None),
+    )
     db.add(p)
+    prev_status = order.status
+    new_paid_total = paid_total + payload.amount
+    if order.status != "canceled":
+        if new_paid_total >= price:
+            order.status = "done"
+        else:
+            order.status = "in_progress"
     db.commit()
     db.refresh(p)
     user = getattr(request.state, "user", None)
@@ -47,6 +59,16 @@ def create_payment(payload: PaymentCreate, request: Request, db: Session = Depen
         str(p.amount),
         tenant_id=tenant_id,
     )
+    if order.status != prev_status:
+        log_activity(
+            db,
+            getattr(user, "id", None),
+            "order.status_updated",
+            "order",
+            order.id,
+            order.status,
+            tenant_id=tenant_id,
+        )
     return p
 
 
@@ -79,8 +101,29 @@ def delete_payment(request: Request, payment_id: int = Path(..., ge=1), db: Sess
     if payment is None:
         raise HTTPException(status_code=404, detail="payment not found")
     amount = payment.amount
+    order_id = payment.order_id
     db.delete(payment)
     db.commit()
+    order = db.execute(
+        select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
+    ).scalar_one_or_none()
+    status_changed = False
+    if order is not None:
+        paid_total_raw = db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.order_id == order_id, Payment.tenant_id == tenant_id)
+        ).scalar_one()
+        paid_total = Decimal(str(paid_total_raw))
+        prev_status = order.status
+        if paid_total >= Decimal(str(order.price)):
+            order.status = "done"
+        elif paid_total == Decimal("0.00"):
+            order.status = "new"
+        else:
+            order.status = "in_progress"
+        if order.status != prev_status:
+            status_changed = True
+            db.commit()
     user = getattr(request.state, "user", None)
     log_activity(
         db,
@@ -91,3 +134,13 @@ def delete_payment(request: Request, payment_id: int = Path(..., ge=1), db: Sess
         str(amount),
         tenant_id=tenant_id,
     )
+    if order is not None and status_changed:
+        log_activity(
+            db,
+            getattr(user, "id", None),
+            "order.status_updated",
+            "order",
+            order_id,
+            order.status,
+            tenant_id=tenant_id,
+        )

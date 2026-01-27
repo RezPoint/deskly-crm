@@ -64,6 +64,7 @@ class Payment(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
 
     amount = Column(Numeric(12, 2), nullable=False)
+    note = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     order = relationship("Order", back_populates="payments")

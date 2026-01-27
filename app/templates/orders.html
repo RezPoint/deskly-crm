@@ -12,7 +12,8 @@
   <div class="section-head">
     <h3>Filters</h3>
     <div class="actions">
-      <a href="/api/export/orders.csv?client_id={{ filter_client_id }}&status={{ filter_status }}&q={{ filter_q }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Export CSV</a>
+      <a class="btn-ghost" href="/api/export/orders.csv?client_id={{ filter_client_id }}&status={{ filter_status }}&q={{ filter_q }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Export CSV</a>
+      <a class="btn-ghost" href="/api/export/orders.xlsx?client_id={{ filter_client_id }}&status={{ filter_status }}&q={{ filter_q }}&date_from={{ filter_date_from }}&date_to={{ filter_date_to }}">Export XLSX</a>
       <a class="link-muted" href="/ui/orders">Reset</a>
     </div>
   </div>
@@ -74,11 +75,15 @@
 <div class="card">
   <div class="section-head">
     <h3>List</h3>
-    <div class="actions">
+  </div>
+  <div class="summary-bar">
+    <div class="stats">
       <span class="stat">Total {{ totals.price|money }}</span>
       <span class="stat">Paid {{ totals.paid|money }}</span>
       <span class="stat">Due {{ totals.balance|money }}</span>
-      <a class="link-muted" href="{{ summary_url }}">API summary</a>
+    </div>
+    <div class="actions">
+      <a class="btn-ghost" href="{{ summary_url }}">API summary</a>
     </div>
   </div>
   {% if orders|length == 0 %}
@@ -94,12 +99,11 @@
           <th>ID</th>
           <th>Client</th>
           <th>Title</th>
-        <th>Status</th>
-          <th>Price</th>
-          <th>Paid</th>
-          <th>Due</th>
-          <th></th>
-          <th></th>
+          <th>Status</th>
+          <th class="numeric">Price</th>
+          <th class="numeric">Paid</th>
+          <th class="numeric">Due</th>
+          <th class="actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -108,31 +112,38 @@
           <td>{{ o.id }}</td>
           <td>{{ (client_map.get(o.client_id).name if client_map.get(o.client_id) else o.client_id) }}</td>
           <td>{{ o.title }}</td>
-        <td>
-          <span class="pill {{ o.status }}">{{ o.status }}</span>
-          {% if request.state.user and request.state.user.role != "viewer" %}
-            <form method="post" action="/ui/orders/{{ o.id }}/status" class="row tight compact">
-              <select name="status">
-                <option value="new" {% if o.status == "new" %}selected{% endif %}>new</option>
-                <option value="in_progress" {% if o.status == "in_progress" %}selected{% endif %}>in_progress</option>
-                <option value="done" {% if o.status == "done" %}selected{% endif %}>done</option>
-                <option value="canceled" {% if o.status == "canceled" %}selected{% endif %}>canceled</option>
-              </select>
-              <button type="submit" class="btn-ghost">Save</button>
-            </form>
-          {% endif %}
-        </td>
-          <td>{{ o.price|money }}</td>
-          <td>{{ (paid_map.get(o.id, 0))|money }}</td>
-          <td>{{ (o.price - paid_map.get(o.id, 0))|money }}</td>
-          <td><a href="/ui/orders/{{ o.id }}">Open</a></td>
-        <td class="actions">
-          <form method="post" action="/ui/orders/{{ o.id }}/delete" class="inline" data-confirm="Delete order and all payments?">
-            {% if request.state.user and request.state.user.role != "viewer" %}
-              <button type="submit" class="danger">Delete</button>
-            {% endif %}
-          </form>
-        </td>
+          <td>
+            <div class="status-cell">
+              {% if request.state.user and request.state.user.role != "viewer" %}
+                <form method="post" action="/ui/orders/{{ o.id }}/status" class="row tight compact">
+                  <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
+                  <select name="status" data-autosubmit="true" aria-label="Status" class="status-select {{ o.status }}">
+                    <option value="new" {% if o.status == "new" %}selected{% endif %}>New</option>
+                    <option value="in_progress" {% if o.status == "in_progress" %}selected{% endif %}>In progress</option>
+                    <option value="done" {% if o.status == "done" %}selected{% endif %}>Done</option>
+                    <option value="canceled" {% if o.status == "canceled" %}selected{% endif %}>Canceled</option>
+                  </select>
+                </form>
+              {% else %}
+                <span class="pill {{ o.status }}">
+                  {% if o.status == "in_progress" %}in progress{% else %}{{ o.status }}{% endif %}
+                </span>
+              {% endif %}
+            </div>
+          </td>
+          <td class="numeric">{{ o.price|money }}</td>
+          <td class="numeric">{{ (paid_map.get(o.id, 0))|money }}</td>
+          <td class="numeric">{{ (o.price - paid_map.get(o.id, 0))|money }}</td>
+          <td class="actions">
+            <div class="row tight">
+              <a class="btn-ghost" href="/ui/orders/{{ o.id }}">Open</a>
+              <form method="post" action="/ui/orders/{{ o.id }}/delete" class="inline" data-confirm="Delete order and all payments?">
+                {% if request.state.user and request.state.user.role != "viewer" %}
+                  <button type="submit" class="danger">Delete</button>
+                {% endif %}
+              </form>
+            </div>
+          </td>
         </tr>
       {% endfor %}
       </tbody>

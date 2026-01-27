@@ -29,21 +29,25 @@
     <input name="entity_id" placeholder="Entity ID" value="{{ filter_entity_id }}" />
     <button type="submit">Apply</button>
   </form>
-  <div class="row">
-    <span class="stat">Open {{ open_count }}</span>
-    <span class="stat">Overdue {{ overdue_count }}</span>
-    <a class="link-muted" href="/ui/reminders?today=1">Today</a>
-    <a class="link-muted" href="/ui/reminders?overdue=1">Overdue</a>
-    {% if request.state.user and request.state.user.role != "viewer" %}
-      <form method="post" action="/api/reminders/ui/mark-all-done" class="inline">
-        <input type="hidden" name="scope" value="open" />
-        <button type="submit" class="btn-ghost">Mark all done</button>
-      </form>
-      <form method="post" action="/api/reminders/ui/mark-all-done" class="inline">
-        <input type="hidden" name="scope" value="overdue" />
-        <button type="submit" class="btn-ghost">Mark overdue done</button>
-      </form>
-    {% endif %}
+  <div class="summary-bar">
+    <div class="stats">
+      <span class="stat">Open {{ open_count }}</span>
+      <span class="stat">Overdue {{ overdue_count }}</span>
+    </div>
+    <div class="actions">
+      <a class="btn-ghost compact" href="/ui/reminders?today=1">Today</a>
+      <a class="btn-ghost compact" href="/ui/reminders?overdue=1">Overdue</a>
+      {% if request.state.user and request.state.user.role != "viewer" %}
+        <form method="post" action="/api/reminders/ui/mark-all-done" class="inline">
+          <input type="hidden" name="scope" value="open" />
+          <button type="submit" class="btn-ghost compact">Mark all done</button>
+        </form>
+        <form method="post" action="/api/reminders/ui/mark-all-done" class="inline">
+          <input type="hidden" name="scope" value="overdue" />
+          <button type="submit" class="btn-ghost compact">Mark overdue done</button>
+        </form>
+      {% endif %}
+    </div>
   </div>
 </div>
 
@@ -67,8 +71,10 @@
 <div class="card">
   <div class="section-head">
     <h3>List</h3>
-    <div class="actions">
-      <span class="muted">Total: {{ reminders|length }}</span>
+  </div>
+  <div class="summary-bar">
+    <div class="stats">
+      <span class="stat">Total {{ reminders|length }}</span>
     </div>
   </div>
   {% if reminders|length == 0 %}
@@ -82,7 +88,7 @@
           <th>Status</th>
           <th>Due</th>
           <th>Linked</th>
-          <th></th>
+          <th class="actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -107,14 +113,16 @@
           </td>
           <td class="actions">
             {% if request.state.user and request.state.user.role != "viewer" %}
-              {% if r.status != "done" %}
-                <form method="post" action="/api/reminders/ui/{{ r.id }}/done" class="inline">
-                  <button type="submit" class="btn-ghost">Done</button>
+              <div class="row tight">
+                {% if r.status != "done" %}
+                  <form method="post" action="/api/reminders/ui/{{ r.id }}/done" class="inline">
+                    <button type="submit" class="btn-ghost compact">Done</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="/api/reminders/ui/{{ r.id }}/delete" class="inline" data-confirm="Delete reminder?">
+                  <button type="submit" class="danger">Delete</button>
                 </form>
-              {% endif %}
-              <form method="post" action="/api/reminders/ui/{{ r.id }}/delete" class="inline" data-confirm="Delete reminder?">
-                <button type="submit" class="danger">Delete</button>
-              </form>
+              </div>
             {% endif %}
           </td>
         </tr>

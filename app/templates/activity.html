@@ -24,8 +24,10 @@
 <div class="card">
   <div class="section-head">
     <h3>Recent events</h3>
-    <div class="actions">
-      <span class="muted">Total: {{ logs|length }}</span>
+  </div>
+  <div class="summary-bar">
+    <div class="stats">
+      <span class="stat">Total {{ logs|length }}</span>
     </div>
   </div>
   {% if logs|length == 0 %}
