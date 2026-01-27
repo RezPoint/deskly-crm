@@ -46,10 +46,17 @@
       background: #fff;
       font-family: "Inter", system-ui, sans-serif;
     }
+    input:focus, select:focus, textarea:focus, button:focus {
+      outline: 2px solid rgba(47, 111, 94, 0.25);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
     button { cursor: pointer; background: var(--accent); color: #fff; border-color: var(--accent); }
+    button:hover { filter: brightness(1.05); }
     button:disabled { opacity: 0.7; cursor: not-allowed; }
     .inline { display: inline; }
     .danger { color: var(--danger); border-color: #f2b5bd; background: var(--danger-bg); }
+    .danger:hover { filter: brightness(0.98); }
     .err { color: var(--danger); margin: 10px 0; }
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); }
@@ -94,6 +101,9 @@
       background: transparent;
       border: 1px solid var(--line);
       color: var(--accent);
+    }
+    .btn-ghost:hover {
+      background: var(--accent-2);
     }
   </style>
 </head>
