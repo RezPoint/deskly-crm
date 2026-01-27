@@ -657,6 +657,7 @@ def ui_delete_payment(
 
 @router.post("/orders/{order_id}/status")
 def ui_update_order_status(
+    request: Request,
     order_id: int,
     status: str = Form(...),
     db: Session = Depends(get_db),
