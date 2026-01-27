@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -115,8 +115,8 @@ def ui_reminders(
 @router.post("/ui", response_class=RedirectResponse)
 def ui_create_reminder(
     request: Request,
-    title: str = Query(""),
-    due_at: str = Query(""),
+    title: str = Form(""),
+    due_at: str = Form(""),
     db: Session = Depends(get_db),
 ):
     get_current_user(request, db)
