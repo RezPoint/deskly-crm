@@ -8,9 +8,11 @@
   <div><b>Client:</b> {{ client.name if client else order.client_id }}</div>
   <div><b>Title:</b> {{ order.title }}</div>
   <div><b>Status:</b> <span class="pill {{ order.status }}">{{ order.status }}</span></div>
-  <div><b>Price:</b> {{ order.price|money }}</div>
-  <div><b>Paid total:</b> {{ paid_total|money }}</div>
-  <div><b>Balance:</b> {{ balance|money }}</div>
+  <div class="row">
+    <span class="stat">Price {{ order.price|money }}</span>
+    <span class="stat">Paid {{ paid_total|money }}</span>
+    <span class="stat">Balance {{ balance|money }}</span>
+  </div>
   <div><b>Created:</b> {{ order.created_at|dt }}</div>
 
   {% if order.comment %}
