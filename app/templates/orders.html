@@ -43,23 +43,23 @@
   </div>
 </div>
 
-<div class="card">
+<div class="card" id="add-order">
   <h3>Add order</h3>
   <form method="post" action="/ui/orders" class="row">
     <select name="client_id" required>
       {% for c in clients %}
-        <option value="{{ c.id }}">{{ c.name }} ({{ c.id }})</option>
+        <option value="{{ c.id }}" {% if create_client_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.id }})</option>
       {% endfor %}
     </select>
-    <input name="title" placeholder="Title *" required />
-    <input name="price" placeholder="Price (e.g. 15000 or 15000.00)" value="0" />
+    <input name="title" placeholder="Title *" value="{{ create_title }}" required />
+    <input name="price" placeholder="Price (e.g. 15000 or 15000.00)" value="{{ create_price }}" />
     <select name="status">
-      <option value="new">new</option>
-      <option value="in_progress">in_progress</option>
-      <option value="done">done</option>
-      <option value="canceled">canceled</option>
+      <option value="new" {% if create_status == "new" %}selected{% endif %}>new</option>
+      <option value="in_progress" {% if create_status == "in_progress" %}selected{% endif %}>in_progress</option>
+      <option value="done" {% if create_status == "done" %}selected{% endif %}>done</option>
+      <option value="canceled" {% if create_status == "canceled" %}selected{% endif %}>canceled</option>
     </select>
-    <input name="comment" placeholder="Comment" />
+    <input name="comment" placeholder="Comment" value="{{ create_comment }}" />
     <button type="submit">Create</button>
   </form>
 </div>
@@ -67,7 +67,11 @@
 <div class="card">
   <h3>List</h3>
   {% if orders|length == 0 %}
-    <p class="muted">No orders yet. Create one above to start tracking.</p>
+    <p class="muted">No orders yet. Create one to start tracking payments.</p>
+    <div class="row">
+      <a href="#add-order">Add order</a>
+      <a href="/ui/clients" class="muted">Add client first</a>
+    </div>
   {% else %}
     <div class="row">
       <span class="muted">Total price: {{ totals.price|money }}</span>
@@ -75,49 +79,49 @@
       <span class="muted">Balance: {{ totals.balance|money }}</span>
       <a class="muted" href="{{ summary_url }}">API summary</a>
     </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Client</th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Price</th>
+          <th>Paid</th>
+          <th>Balance</th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for o in orders %}
+        <tr>
+          <td>{{ o.id }}</td>
+          <td>{{ (client_map.get(o.client_id).name if client_map.get(o.client_id) else o.client_id) }}</td>
+          <td>{{ o.title }}</td>
+          <td>{{ o.status }}</td>
+          <td>{{ o.price|money }}</td>
+          <td>{{ (paid_map.get(o.id, 0))|money }}</td>
+          <td>{{ (o.price - paid_map.get(o.id, 0))|money }}</td>
+          <td><a href="/ui/orders/{{ o.id }}">Open</a></td>
+          <td class="actions">
+            <form method="post" action="/ui/orders/{{ o.id }}/delete" class="inline" data-confirm="Delete order and all payments?">
+              <button type="submit" class="danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="row">
+      <span class="muted">Page {{ page }} / {{ total_pages }}</span>
+      {% if page > 1 %}
+        <a href="/ui/orders?q={{ filter_q }}&client_id={{ filter_client_id }}&status={{ filter_status }}&sort={{ filter_sort }}&page={{ page - 1 }}&page_size={{ page_size }}">Prev</a>
+      {% endif %}
+      {% if page < total_pages %}
+        <a href="/ui/orders?q={{ filter_q }}&client_id={{ filter_client_id }}&status={{ filter_status }}&sort={{ filter_sort }}&page={{ page + 1 }}&page_size={{ page_size }}">Next</a>
+      {% endif %}
+    </div>
   {% endif %}
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Client</th>
-        <th>Title</th>
-        <th>Status</th>
-        <th>Price</th>
-        <th>Paid</th>
-        <th>Balance</th>
-        <th></th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for o in orders %}
-      <tr>
-        <td>{{ o.id }}</td>
-        <td>{{ (client_map.get(o.client_id).name if client_map.get(o.client_id) else o.client_id) }}</td>
-        <td>{{ o.title }}</td>
-        <td>{{ o.status }}</td>
-        <td>{{ o.price|money }}</td>
-        <td>{{ (paid_map.get(o.id, 0))|money }}</td>
-        <td>{{ (o.price - paid_map.get(o.id, 0))|money }}</td>
-        <td><a href="/ui/orders/{{ o.id }}">Open</a></td>
-        <td class="actions">
-          <form method="post" action="/ui/orders/{{ o.id }}/delete" class="inline" data-confirm="Delete order and all payments?">
-            <button type="submit" class="danger">Delete</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  <div class="row">
-    <span class="muted">Page {{ page }} / {{ total_pages }}</span>
-    {% if page > 1 %}
-      <a href="/ui/orders?q={{ filter_q }}&client_id={{ filter_client_id }}&status={{ filter_status }}&sort={{ filter_sort }}&page={{ page - 1 }}&page_size={{ page_size }}">Prev</a>
-    {% endif %}
-    {% if page < total_pages %}
-      <a href="/ui/orders?q={{ filter_q }}&client_id={{ filter_client_id }}&status={{ filter_status }}&sort={{ filter_sort }}&page={{ page + 1 }}&page_size={{ page_size }}">Next</a>
-    {% endif %}
-  </div>
 </div>
 {% endblock %}
