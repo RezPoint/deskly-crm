@@ -7,7 +7,7 @@
 <div class="card">
   <div><b>Client:</b> {{ client.name if client else order.client_id }}</div>
   <div><b>Title:</b> {{ order.title }}</div>
-  <div><b>Status:</b> {{ order.status }}</div>
+  <div><b>Status:</b> <span class="pill {{ order.status }}">{{ order.status }}</span></div>
   <div><b>Price:</b> {{ order.price|money }}</div>
   <div><b>Paid total:</b> {{ paid_total|money }}</div>
   <div><b>Balance:</b> {{ balance|money }}</div>
