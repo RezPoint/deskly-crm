@@ -2,7 +2,8 @@ from app.models import User
 from app.security import hash_password
 
 
-def test_setup_then_login_flow(anon_client):
+def test_setup_then_login_flow(anon_client, monkeypatch):
+    monkeypatch.setenv("ALLOW_SETUP", "1")
     r = anon_client.get("/setup")
     assert r.status_code == 200
 
@@ -19,7 +20,8 @@ def test_setup_then_login_flow(anon_client):
     assert r.status_code == 200
 
 
-def test_login_redirects_to_setup_when_no_users(anon_client):
+def test_login_redirects_to_setup_when_no_users(anon_client, monkeypatch):
+    monkeypatch.setenv("ALLOW_SETUP", "1")
     r = anon_client.get("/login", follow_redirects=False)
     assert r.status_code in {302, 303}
     assert r.headers["location"] == "/setup"
@@ -48,3 +50,8 @@ def test_viewer_restrictions_ui(client):
 
     r = viewer_client.post("/ui/clients", data={"name": "Nope"})
     assert r.status_code == 403
+
+
+def test_setup_disabled_by_default(anon_client):
+    r = anon_client.get("/setup")
+    assert r.status_code == 404

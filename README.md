@@ -70,8 +70,9 @@ You can also run migrations on startup by setting `MIGRATE_ON_START=1`.
 Environment variables:
 - `LOG_LEVEL` (default: `INFO`)
 - `APP_VERSION` (default: `0.0.0`)
- - `JWT_SECRET` (default: `dev-secret-change-me`)
- - `JWT_EXPIRE_MINUTES` (default: `1440`)
+- `JWT_SECRET` (default: `dev-secret-change-me`)
+- `JWT_EXPIRE_MINUTES` (default: `1440`)
+- `ALLOW_SETUP` (default: `0`) - set to `1` only for first-time setup
 
 Endpoints:
 - `GET /health` returns `status`, `service`, `version`, `db`, `uptime_seconds`
@@ -79,8 +80,9 @@ Endpoints:
 
 ## Auth (0.2)
 - First run: open `/setup` to create the owner account.
+- `/setup` is disabled unless `ALLOW_SETUP=1`.
 - Login via `/login` (web) or `POST /api/auth/login` (API).
- - To add users, go to `/ui/users` as owner/admin.
+- To add users, go to `/ui/users` as owner/admin.
 
 ## Development
 ```bash
