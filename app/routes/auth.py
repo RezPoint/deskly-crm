@@ -12,6 +12,7 @@ from ..db import get_db
 from ..models import User
 from ..security import create_access_token, hash_password, verify_password
 from ..auth import get_current_user, require_role
+from ..validators import validate_email
 from .ui import templates
 
 
@@ -47,8 +48,11 @@ def setup_submit(
     if _has_users(db):
         return RedirectResponse(url="/login", status_code=303)
 
-    email = (email or "").strip().lower()
-    if not email or "@" not in email:
+    try:
+        email = validate_email(email)
+    except ValueError:
+        email = None
+    if not email:
         return templates.TemplateResponse(
             request,
             "setup.html",
@@ -136,10 +140,13 @@ def api_list_users(request: Request, db: Session = Depends(get_db)):
 def api_create_user(request: Request, payload: dict, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     require_role(user, {"owner", "admin"})
-    email = (payload.get("email") or "").strip().lower()
+    try:
+        email = validate_email(payload.get("email"))
+    except ValueError:
+        email = None
     password = payload.get("password") or ""
     role = (payload.get("role") or "viewer").strip()
-    if not email or "@" not in email:
+    if not email:
         raise HTTPException(status_code=422, detail="valid email required")
     if len(password) < 6:
         raise HTTPException(status_code=422, detail="password must be at least 6 chars")
@@ -208,8 +215,11 @@ def ui_create_user(
 ):
     user = get_current_user(request, db)
     require_role(user, {"owner", "admin"})
-    email = (email or "").strip().lower()
-    if not email or "@" not in email:
+    try:
+        email = validate_email(email)
+    except ValueError:
+        email = None
+    if not email:
         return templates.TemplateResponse(
             request,
             "users.html",

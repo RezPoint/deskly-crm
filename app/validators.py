@@ -30,3 +30,21 @@ def validate_telegram(value: Optional[str]) -> Optional[str]:
     if not _TELEGRAM_ALLOWED.match(handle):
         raise ValueError("telegram must be 5-32 chars: letters, numbers, underscore")
     return f"@{handle}"
+
+
+def validate_email(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    email = value.strip().lower()
+    if not email:
+        return None
+    if " " in email or "\t" in email or "\n" in email:
+        raise ValueError("email must be a valid address")
+    if email.count("@") != 1:
+        raise ValueError("email must be a valid address")
+    local, domain = email.split("@", 1)
+    if not local or not domain:
+        raise ValueError("email must be a valid address")
+    if "." not in domain:
+        raise ValueError("email must be a valid address")
+    return email

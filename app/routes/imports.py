@@ -36,6 +36,11 @@ def _process_clients(rows: list[dict], db: Session) -> tuple[int, list[str]]:
     required = {"name"}
     errors: list[str] = []
     created = 0
+    existing_rows = db.execute(select(Client.phone, Client.telegram)).all()
+    existing_phones = {row[0] for row in existing_rows if row[0]}
+    existing_telegrams = {row[1] for row in existing_rows if row[1]}
+    seen_phones: set[str] = set()
+    seen_telegrams: set[str] = set()
     for idx, row in enumerate(rows, start=2):  # header is row 1
         missing = [k for k in required if not row.get(k)]
         if missing:
@@ -60,6 +65,24 @@ def _process_clients(rows: list[dict], db: Session) -> tuple[int, list[str]]:
             message = ", ".join(field_errors) if field_errors else "invalid contact data"
             errors.append(f"row {idx}: {message}")
             continue
+        if phone:
+            if phone in seen_phones:
+                errors.append(f"row {idx}: duplicate phone in CSV")
+                continue
+            if phone in existing_phones:
+                errors.append(f"row {idx}: phone already exists")
+                continue
+        if telegram:
+            if telegram in seen_telegrams:
+                errors.append(f"row {idx}: duplicate telegram in CSV")
+                continue
+            if telegram in existing_telegrams:
+                errors.append(f"row {idx}: telegram already exists")
+                continue
+        if phone:
+            seen_phones.add(phone)
+        if telegram:
+            seen_telegrams.add(telegram)
         db.add(Client(name=name, phone=phone, telegram=telegram, notes=notes))
         created += 1
     return created, errors

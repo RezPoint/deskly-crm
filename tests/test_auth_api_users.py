@@ -16,3 +16,8 @@ def test_users_api_crud(client):
     # owner can change role
     r = client.patch(f"/api/users/{user_id}/role", json={"role": "admin"})
     assert r.status_code == 200
+
+
+def test_users_api_invalid_email(client):
+    r = client.post("/api/users", json={"email": "bad-email", "password": "secret123", "role": "viewer"})
+    assert r.status_code == 422
