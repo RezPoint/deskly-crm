@@ -9,7 +9,9 @@
 {% endif %}
 
 <div class="card">
-  <h3>Create owner account</h3>
+  <div class="section-head">
+    <h3>Create owner account</h3>
+  </div>
   <form method="post" action="/setup" class="row">
     <input name="workspace" type="text" placeholder="Workspace name" value="{{ workspace }}" />
     <input name="email" type="email" placeholder="Email" value="{{ email }}" required autofocus />

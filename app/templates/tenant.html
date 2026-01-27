@@ -5,7 +5,9 @@
 <h1>Workspace</h1>
 
 <div class="card">
-  <h3>{{ tenant.name }}</h3>
+  <div class="section-head">
+    <h3>{{ tenant.name }}</h3>
+  </div>
   <p class="muted">Slug: {{ tenant.slug }}</p>
   <p class="muted">Created: {{ tenant.created_at|dt }}</p>
 </div>

@@ -9,7 +9,9 @@
 {% endif %}
 
 <div class="card">
-  <h3>Add user</h3>
+  <div class="section-head">
+    <h3>Add user</h3>
+  </div>
   <form method="post" action="/ui/users" class="row">
     <input name="email" type="email" placeholder="Email" required />
     <input name="password" type="password" placeholder="Password (min 6)" required />
@@ -23,7 +25,12 @@
 </div>
 
 <div class="card">
-  <h3>List</h3>
+  <div class="section-head">
+    <h3>List</h3>
+    <div class="actions">
+      <span class="muted">Total: {{ users|length }}</span>
+    </div>
+  </div>
   <table>
     <thead>
       <tr>
@@ -43,7 +50,7 @@
         <td class="muted">{{ u.created_at|dt }}</td>
         <td class="actions">
           {% if request.state.user and request.state.user.role == "owner" %}
-            <form method="post" action="/ui/users/{{ u.id }}/role" class="row">
+            <form method="post" action="/ui/users/{{ u.id }}/role" class="row tight compact">
               <select name="role">
                 <option value="owner" {% if u.role == "owner" %}selected{% endif %}>owner</option>
                 <option value="admin" {% if u.role == "admin" %}selected{% endif %}>admin</option>
@@ -54,7 +61,7 @@
           {% else %}
             <span class="muted">Role changes: owner only</span>
           {% endif %}
-          <form method="post" action="/ui/users/{{ u.id }}/reset-password" class="row">
+          <form method="post" action="/ui/users/{{ u.id }}/reset-password" class="row tight compact">
             <input name="password" type="password" placeholder="New password" required />
             <button type="submit" class="btn-ghost">Reset</button>
           </form>

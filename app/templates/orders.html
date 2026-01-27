@@ -77,7 +77,7 @@
     <div class="actions">
       <span class="stat">Total {{ totals.price|money }}</span>
       <span class="stat">Paid {{ totals.paid|money }}</span>
-      <span class="stat">Balance {{ totals.balance|money }}</span>
+      <span class="stat">Due {{ totals.balance|money }}</span>
       <a class="link-muted" href="{{ summary_url }}">API summary</a>
     </div>
   </div>
@@ -97,7 +97,7 @@
         <th>Status</th>
           <th>Price</th>
           <th>Paid</th>
-          <th>Balance</th>
+          <th>Due</th>
           <th></th>
           <th></th>
         </tr>

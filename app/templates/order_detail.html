@@ -5,13 +5,19 @@
 <h1>Order #{{ order.id }}</h1>
 
 <div class="card">
+  <div class="section-head">
+    <h3>Overview</h3>
+    <div class="actions">
+      <a class="link-muted" href="/ui/orders">Back to orders</a>
+    </div>
+  </div>
   <div><b>Client:</b> {{ client.name if client else order.client_id }}</div>
   <div><b>Title:</b> {{ order.title }}</div>
   <div><b>Status:</b> <span class="pill {{ order.status }}">{{ order.status }}</span></div>
   <div class="row">
     <span class="stat">Price {{ order.price|money }}</span>
     <span class="stat">Paid {{ paid_total|money }}</span>
-    <span class="stat">Balance {{ balance|money }}</span>
+    <span class="stat">Due {{ balance|money }}</span>
   </div>
   <div><b>Created:</b> {{ order.created_at|dt }}</div>
 
@@ -25,26 +31,30 @@
     <p class="err"><b>{{ error }}</b></p>
   {% endif %}
 
-  <h3>Update status</h3>
+  <div class="section-head">
+    <h3>Update status</h3>
+  </div>
   {% if request.state.user and request.state.user.role != "viewer" %}
-    <form method="post" action="/ui/orders/{{ order.id }}/status" class="row">
+    <form method="post" action="/ui/orders/{{ order.id }}/status" class="row tight compact">
       <select name="status" aria-label="Status">
         <option value="new" {% if order.status == "new" %}selected{% endif %}>new</option>
         <option value="in_progress" {% if order.status == "in_progress" %}selected{% endif %}>in_progress</option>
         <option value="done" {% if order.status == "done" %}selected{% endif %}>done</option>
         <option value="canceled" {% if order.status == "canceled" %}selected{% endif %}>canceled</option>
       </select>
-      <button type="submit">Save</button>
+      <button type="submit" class="btn-ghost">Save</button>
     </form>
   {% else %}
     <p class="muted">Viewer role cannot update status.</p>
   {% endif %}
 
-  <h3>Update price</h3>
+  <div class="section-head">
+    <h3>Update price</h3>
+  </div>
   {% if request.state.user and request.state.user.role != "viewer" %}
-    <form method="post" action="/ui/orders/{{ order.id }}/price" class="row">
+    <form method="post" action="/ui/orders/{{ order.id }}/price" class="row tight compact">
       <input name="price" value="{{ price_input }}" type="number" min="0" step="0.01" aria-label="Price" />
-      <button type="submit">Save</button>
+      <button type="submit" class="btn-ghost">Save</button>
     </form>
   {% else %}
     <p class="muted">Viewer role cannot update price.</p>
@@ -52,7 +62,9 @@
 </div>
 
 <div class="card">
-  <h3>Add payment</h3>
+  <div class="section-head">
+    <h3>Add payment</h3>
+  </div>
   {% if request.state.user and request.state.user.role != "viewer" %}
     <form method="post" action="/ui/orders/{{ order.id }}/payments" class="row">
       <input name="amount" placeholder="Amount (e.g. 8000 or 8000.00)" value="{{ payment_amount }}" type="number" min="0.01" step="0.01" required aria-label="Payment amount" />
@@ -65,7 +77,12 @@
 </div>
 
 <div class="card">
-  <h3>Payments</h3>
+  <div class="section-head">
+    <h3>Payments</h3>
+    <div class="actions">
+      <span class="muted">Total: {{ payments|length }}</span>
+    </div>
+  </div>
   {% if payments|length == 0 %}
     <p class="muted">No payments yet. Add the first payment above.</p>
   {% else %}
@@ -97,6 +114,4 @@
     </table>
   {% endif %}
 </div>
-
-<p><a href="/ui/orders"><- Back to orders</a></p>
 {% endblock %}

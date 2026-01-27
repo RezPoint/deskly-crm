@@ -5,7 +5,12 @@
 <h1>Import</h1>
 
 <div class="card">
-  <h3>Import clients</h3>
+  <div class="section-head">
+    <h3>Import clients</h3>
+    <div class="actions">
+      <a class="link-muted" href="/api/export/templates/clients.csv">Download template</a>
+    </div>
+  </div>
   <form method="post" action="/ui/import/clients" enctype="multipart/form-data" class="row">
     <input type="file" name="file" accept=".csv" required />
     <label class="row">
@@ -53,7 +58,12 @@
 </div>
 
 <div class="card">
-  <h3>Import orders</h3>
+  <div class="section-head">
+    <h3>Import orders</h3>
+    <div class="actions">
+      <a class="link-muted" href="/api/export/templates/orders.csv">Download template</a>
+    </div>
+  </div>
   <form method="post" action="/ui/import/orders" enctype="multipart/form-data" class="row">
     <input type="file" name="file" accept=".csv" required />
     <label class="row">
