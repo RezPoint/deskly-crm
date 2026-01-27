@@ -100,6 +100,7 @@
           <td>{{ (client_map.get(o.client_id).name if client_map.get(o.client_id) else o.client_id) }}</td>
           <td>{{ o.title }}</td>
         <td>
+          <span class="pill {{ o.status }}">{{ o.status }}</span>
           <form method="post" action="/ui/orders/{{ o.id }}/status" class="row">
             <select name="status">
               <option value="new" {% if o.status == "new" %}selected{% endif %}>new</option>
@@ -107,7 +108,7 @@
               <option value="done" {% if o.status == "done" %}selected{% endif %}>done</option>
               <option value="canceled" {% if o.status == "canceled" %}selected{% endif %}>canceled</option>
             </select>
-            <button type="submit">Save</button>
+            <button type="submit" class="btn-ghost">Save</button>
           </form>
         </td>
           <td>{{ o.price|money }}</td>
