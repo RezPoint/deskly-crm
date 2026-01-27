@@ -27,7 +27,9 @@
     }
     a { text-decoration: none; color: var(--accent); }
     nav { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+    nav .brand { font-weight: 700; letter-spacing: 0.2px; margin-right: auto; color: var(--ink); }
     nav a { padding: 6px 10px; border-radius: 999px; background: var(--accent-2); color: var(--accent); font-weight: 600; }
+    nav a.active { background: var(--accent); color: #fff; }
     .card {
       border: 1px solid var(--line);
       border-radius: 16px;
@@ -96,9 +98,11 @@
   </style>
 </head>
 <body>
+  {% set path = request.url.path if request else "" %}
   <nav>
-    <a href="/ui/clients">Clients</a>
-    <a href="/ui/orders">Orders</a>
+    <span class="brand">DesklyCRM</span>
+    <a href="/ui/clients" class="{% if path.startswith('/ui/clients') %}active{% endif %}">Clients</a>
+    <a href="/ui/orders" class="{% if path.startswith('/ui/orders') %}active{% endif %}">Orders</a>
     <a href="/docs">Swagger</a>
   </nav>
 
