@@ -112,6 +112,12 @@ def ui_reminders(
     if entity_id:
         stmt = stmt.where(Reminder.entity_id == entity_id)
     reminders = db.execute(stmt).scalars().all()
+    open_count = db.execute(
+        select(Reminder).where(Reminder.status == "open")
+    ).scalars().all()
+    overdue_count = db.execute(
+        select(Reminder).where(Reminder.status == "open").where(Reminder.due_at < datetime.utcnow())
+    ).scalars().all()
     return templates.TemplateResponse(
         request,
         "reminders.html",
@@ -122,6 +128,8 @@ def ui_reminders(
             "filter_overdue": overdue or "",
             "filter_entity_type": entity_type or "",
             "filter_entity_id": entity_id or "",
+            "open_count": len(open_count),
+            "overdue_count": len(overdue_count),
         },
     )
 
