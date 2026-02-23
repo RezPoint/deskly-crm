@@ -13,3 +13,4 @@ alembic
 prometheus-client
 passlib
 python-jose
+pydantic-settings
