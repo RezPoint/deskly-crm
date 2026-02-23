@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2] - 2026-02-23
+### Added
+- **Analytics Dashboard**: New widgets for revenue, debt, order statistics, and recent activity logic.
+- **Vanilla JS SPA**: Complete rewrite of the frontend directly consuming standard REST APIs, migrating away from Jinja2 templates.
+- **Clean Architecture**: Backend completely refactored into distinct layers (`core`, `models`, `schemas`, `services`, `api`).
+
+### Fixed
+- Resolved massive UI bugs causing raw HTML strings (`<tr>`, `<button>`) to render as plain text in JavaScript string literals.
+- Unified application versioning across `pyproject.toml` and application configuration.
+
 ## [0.1.3] - 2026-01-26
 ### Added
 - Dockerfile, docker-compose, and .dockerignore for containerized dev.

@@ -1,1 +1,0 @@
-# DesklyCRM application package

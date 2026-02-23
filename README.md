@@ -1,192 +1,76 @@
 ﻿# DesklyCRM
 
-[![CI](https://github.com/RezPoint/deskly-crm/actions/workflows/ci.yml/badge.svg)](https://github.com/RezPoint/deskly-crm/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml/badge.svg)](https://github.com/RezPoint/deskly-crm/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/github/v/release/RezPoint/deskly-crm)](https://github.com/RezPoint/deskly-crm/releases)
+DesklyCRM — это современный, легкий и быстрый менеджер клиентов и заказов для малого бизнеса и фрилансеров. 
+Позволяет отслеживать запросы, статусы, платежи, напоминания и выгружать отчеты.
 
-DesklyCRM is a lightweight client and order manager for freelancers and small businesses - track requests, statuses, payments, reminders, and export reports in CSV.
+Проект построен на базе **Clean Architecture** с полным разделением Backend (REST API) и Frontend (SPA).
 
-## Why DesklyCRM
-Keep your client work in one place: who requested what, what's in progress, what's paid, and what's done - without heavy CRMs.
+## Зачем нужен DesklyCRM
+Держите работу с клиентами в одном месте: кто что заказал, что в работе, что оплачено, а что завершено — без тяжеловесных и сложных корпоративных CRM. Идеально для работы индивидуальных предпринимателей и небольших команд.
 
-## Features (MVP)
-- **Clients directory** - contacts, notes, quick lookup
-- **Orders tracking** - title, price, comments, linked client
-- **Status workflow** - `new` / `in_progress` / `done` / `canceled`
-- **Payments** - partial payments and balance tracking
-- **CSV export** - download orders as a report
-- **CSV import** - bulk import clients and orders
-- **Reminders** - due dates and linked entities
-- **Activity log** - audit trail for important actions
+## Возможности
+- **Справочник клиентов** — контакты, заметки, Telegram
+- **Учет заказов** — название, цена, комментарии, клиент
+- **Рабочий процесс (статусы)** — `new` / `in_progress` / `done` / `canceled`
+- **Платежи** — частичные оплаты и автоматическое отслеживание остатка (баланса)
+- **Управление задачами** — встроенные ToDo напоминания
+- **Журнал активности (Аудит)** — история всех изменений в системе
+- **Импорт / Экспорт CSV** — массовая загрузка и выгрузка базы данных
+- **Пользователи и Инвайты** — мультиаккаунт с помощью системы приглашений
 
-## Tech Stack
-- **Backend:** FastAPI (Python)
-- **Database:** PostgreSQL (recommended) / SQLite (local default)
-- **UI:** Jinja2 templates (simple web interface)
+## Технологический стек
+- **Backend:** FastAPI (Python 3.10+) + Pydantic + SQLAlchemy
+- **База данных:** SQLite (для локального старта) / PostgreSQL (продакшен)
+- **Frontend:** Vanilla JavaScript (SPA), HTML5, CSS3 (Glassmorphism UI)
+- **Тестирование:** Pytest
 
-## Quick Start
-> Requirements: Python 3.10+
+## Быстрый старт локально
 
 ```bash
+# 1. Клонирование репозитория
+git clone https://github.com/RezPoint/deskly-crm.git
+cd deskly-crm
+
+# 2. Установка зависимостей
 pip install -r requirements.txt
+
+# 3. Запуск сервера FastAPI
 uvicorn app.main:app --reload
 ```
 
-Open in your browser:
-- http://127.0.0.1:8000/setup (first run only)
-- http://127.0.0.1:8000/login
-- http://127.0.0.1:8000/ui/clients
+Откройте в браузере `http://127.0.0.1:8000/`.  
+*SPA интерфейс автоматически загрузится.* Для первого входа создайте аккаунт администратора.
 
-Health: http://127.0.0.1:8000/health
-Metrics: http://127.0.0.1:8000/metrics
+## Окружение (`.env`)
+Скопируйте `.env.example` в `.env` (или создайте новый) и настройте переменные:
+- `DATABASE_URL` = `sqlite:///./deskly.db` (по умолчанию)
+- `JWT_SECRET` = `ваша_секретная_строка_минимум_32_символа`
+- `JWT_EXPIRE_MINUTES` = `1440`
+- `PROJECT_NAME` = `DesklyCRM API`
 
-## Environment
-Copy `.env.example` to `.env` and adjust values as needed.
-
-Main variables:
-- `DATABASE_URL` (defaults to SQLite)
-- `JWT_SECRET`
-- `JWT_EXPIRE_MINUTES`
-- `LOG_LEVEL`
-- `APP_VERSION`
-- `MIGRATE_ON_START` (set to `1` to run migrations on startup)
-- `AUTO_CREATE_DB` (set to `0` when using migrations in production)
-
-## Docker (Recommended)
-```bash
-docker compose up --build
-```
-
-Open in your browser: http://127.0.0.1:8000
-Health: http://127.0.0.1:8000/health
-Metrics: http://127.0.0.1:8000/metrics
-UI: http://127.0.0.1:8000/ui/clients
-
-### Docker workflow
-- Code changes only: `docker compose restart web`
-- Dependency/Dockerfile changes: `docker compose up -d --build`
-
-## PostgreSQL (Local)
-Set `DATABASE_URL` to use Postgres:
-
-PowerShell:
-```bash
-$env:DATABASE_URL="postgresql+psycopg://deskly:deskly@localhost:5432/desklycrm"
-```
-
-Command Prompt:
-```bash
-set DATABASE_URL=postgresql+psycopg://deskly:deskly@localhost:5432/desklycrm
-```
-
-## Database Migrations
-Alembic is available for schema migrations.
-```bash
-alembic upgrade head
-```
-
-To create new migrations:
-```bash
-alembic revision --autogenerate -m "describe change"
-```
-
-If you use migrations in production, set `AUTO_CREATE_DB=0` to avoid `create_all`.
-PostgreSQL users should run migrations after changing `DATABASE_URL`.
-You can also run migrations on startup by setting `MIGRATE_ON_START=1`.
-
-## Observability
-Environment variables:
-- `LOG_LEVEL` (default: `INFO`)
-- `APP_VERSION` (default: `0.0.0`)
-- `JWT_SECRET` (default: `dev-secret-change-me`)
-- `JWT_EXPIRE_MINUTES` (default: `1440`)
-
-Endpoints:
-- `GET /health` returns `status`, `service`, `version`, `db`, `uptime_seconds`
-- `GET /metrics` exposes Prometheus metrics
-
-## CSV Import
-API endpoints:
-- `POST /api/import/clients` (multipart file `file`)
-  - Columns: `name` (required), `phone`, `telegram`, `notes`
-- `POST /api/import/orders` (multipart file `file`)
-  - Columns: `client_id` (required), `title` (required), `price` (required), `status` (optional), `comment`
-Optional query params:
-- `dry_run=true` to validate without saving
-
-CSV templates:
-- `GET /api/export/templates/clients.csv`
-- `GET /api/export/templates/orders.csv`
-UI:
-- `/ui/import` upload CSV files with preview and dry-run
-
-## Auth (0.2)
-- First run: open `/setup` to create the owner account.
-- `/setup` is available only when there are no users yet.
-- Login via `/login` (web) or `POST /api/auth/login` (API).
-- To add users, go to `/ui/users` as owner/admin.
-
-API examples:
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"owner@example.com\",\"password\":\"secret123\"}"
-
-curl -X POST http://127.0.0.1:8000/api/users \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"user@example.com\",\"password\":\"secret123\",\"role\":\"viewer\"}"
-```
-
-## Development
-```bash
-python -m pytest -q
-```
-
-## Project Structure
+## Архитектура проекта
+Кодовая база разделена на независимые слои (Layered Architecture):
 ```txt
 deskly-crm/
   app/
-    main.py
-    db.py
-    models.py
-    schemas.py
-    routes/
-      clients.py
-      orders.py
-    templates/
-      index.html
-      clients.html
-      orders.html
-  tests/
-  requirements.txt
-  README.md
-  LICENSE
+    api/v1/          # FastAPI роутеры (Контроллеры)
+    core/            # Настройки, БД, безопасность (JWT, хэширование)
+    models/          # SQLAlchemy модели БД
+    schemas/         # Pydantic схемы для валидации
+    services/        # Бизнес-логика (CRUD, импорт/экспорт)
+    static/          # Frontend SPA (Vanilla JS, CSS, HTML)
+    main.py          # Точка входа приложения
+  tests/             # Pytest API тесты
+  alembic/           # Миграции базы данных
 ```
 
-## Roadmap
-- v0.1 - clients + orders + statuses + CSV export
-- v0.2 - authentication + user accounts
-- v0.3 - reminders, filters, activity log
-- v1.0 - deploy guide + stable UI
+## API Документация (Swagger)
+FastAPI автоматически генерирует документацию. После запуска сервера она доступна по адресу:
+- **Swagger UI:** `http://127.0.0.1:8000/docs`
+- **ReDoc:** `http://127.0.0.1:8000/redoc`
 
-## Contributing
-
-Issues and pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to add.
-
-See CONTRIBUTING.md for dev setup and PR guidelines.
-
-## Code of Conduct
-
-This project follows the Contributor Covenant Code of Conduct. See CODE_OF_CONDUCT.md.
-
-## Security
-
-Please report security issues privately. See SECURITY.md.
-
-## Support
-
-See SUPPORT.md for help and contact options.
-
-## License
-
-MIT License - see LICENSE.
+## Тестирование
+```bash
+python -m pytest tests/ -v
+```
+Все тесты изолированы и используют моковые in-memory БД.
