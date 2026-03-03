@@ -81,11 +81,6 @@ class ImportService:
             )
             created += 1
 
-        if not errors and created > 0 and current_user_id:
-            act_svc = ActivityService(self.db, self.tenant_id)
-            for _ in range(created):
-                act_svc.log_action(current_user_id, "client.created", "client", message="CSV import")
-
         return created, errors
 
     def process_orders(self, rows: list[dict], current_user_id: int) -> tuple[int, list[str]]:
@@ -153,10 +148,5 @@ class ImportService:
                 )
             )
             created += 1
-
-        if not errors and created > 0 and current_user_id:
-            act_svc = ActivityService(self.db, self.tenant_id)
-            for _ in range(created):
-                act_svc.log_action(current_user_id, "order.created", "order", message="CSV import")
 
         return created, errors

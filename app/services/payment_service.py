@@ -38,6 +38,8 @@ class PaymentService:
 
         paid = Decimal(str(paid_raw))
         price = Decimal(str(order.price))
+        if data.amount <= 0:
+            raise HTTPException(status_code=422, detail="Payment amount must be positive")
         if paid + data.amount > price:
             raise HTTPException(status_code=409, detail="Payment exceeds order remaining balance")
 
