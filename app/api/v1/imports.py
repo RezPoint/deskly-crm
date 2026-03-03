@@ -7,6 +7,7 @@ from ...core.database import get_db
 from ...core.security import get_current_user
 from ...models import User
 from ...services.import_service import ImportService
+from ...services.activity_service import ActivityService
 
 router = APIRouter(tags=["import"])
 
@@ -57,6 +58,10 @@ def import_clients(
         return {"created": created, "dry_run": True}
 
     db.commit()
+    if created > 0 and user_id:
+        act_svc = ActivityService(db, tenant_id)
+        for _ in range(created):
+            act_svc.log_action(user_id, "client.created", "client", message="CSV import")
     return {"created": created}
 
 @router.post("/orders")
@@ -83,4 +88,8 @@ def import_orders(
         return {"created": created, "dry_run": True}
 
     db.commit()
+    if created > 0 and user_id:
+        act_svc = ActivityService(db, tenant_id)
+        for _ in range(created):
+            act_svc.log_action(user_id, "order.created", "order", message="CSV import")
     return {"created": created}

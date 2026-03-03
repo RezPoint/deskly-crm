@@ -17,7 +17,11 @@ class ExportService:
     def _parse_date(self, value: Optional[str], is_end: bool = False) -> Optional[datetime]:
         if not value:
             return None
-        dt = datetime.fromisoformat(value)
+        try:
+            dt = datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=422, detail=f"Invalid date format: {value}")
         if len(value) == 10:
             dt = datetime.combine(dt.date(), time.max if is_end else time.min)
         return dt

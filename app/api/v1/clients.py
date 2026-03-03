@@ -49,6 +49,9 @@ def api_get_client(
 
 @router.delete("/{client_id}", status_code=204)
 def api_delete_client(
+    client_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id)
 ):
     service = ClientService(db, tenant_id)
     service.delete_client(client_id)
