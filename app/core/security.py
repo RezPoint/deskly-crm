@@ -2,6 +2,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Set
 
+import bcrypt
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
@@ -14,12 +15,16 @@ from ..models import User
 # Отсутствует в Pydantic-settings
 ALGORITHM = "HS256"
 
+
 def hash_password(password: str) -> str:
-    # простое хеширование (в дальнейшем можно обновить до bcrypt)
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    """Хеширование пароля с использованием bcrypt."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return hash_password(plain_password) == hashed_password
+    """Проверка пароля. Поддерживает обратную совместимость с SHA-256."""
+    if len(hashed_password) == 64:  # старый SHA-256 формат
+        return hashlib.sha256(plain_password.encode("utf-8")).hexdigest() == hashed_password
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 def create_access_token(user_id: int, role: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
