@@ -12,4 +12,6 @@ psycopg[binary]
 alembic
 prometheus-client
 passlib
-python-jose
+PyJWT
+pydantic-settings
+bcrypt
