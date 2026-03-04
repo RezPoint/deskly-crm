@@ -26,7 +26,14 @@ const el = {
     modalContainer: document.getElementById('modal-container'),
     dynamicModal: document.getElementById('dynamic-modal'),
     tableContainer: document.getElementById('table-container'),
-    dashboardContent: document.getElementById('dashboard-content')
+    dashboardContent: document.getElementById('dashboard-content'),
+    btnTheme: document.getElementById('btn-theme'),
+    themeLabel: document.getElementById('theme-label'),
+    themeIconSun: document.getElementById('theme-icon-sun'),
+    themeIconMoon: document.getElementById('theme-icon-moon'),
+    btnHamburger: document.getElementById('btn-hamburger'),
+    sidebar: document.getElementById('sidebar'),
+    sidebarOverlay: document.getElementById('sidebar-overlay')
 };
 
 // --- Initialization ---
@@ -118,6 +125,52 @@ el.btnLogout.addEventListener('click', async () => {
     await handleLogout();
 });
 
+// --- Theme Toggle ---
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    if (theme === 'dark') {
+        el.themeIconSun.style.display = 'none';
+        el.themeIconMoon.style.display = 'block';
+        el.themeLabel.textContent = 'Светлая тема';
+    } else {
+        el.themeIconSun.style.display = 'block';
+        el.themeIconMoon.style.display = 'none';
+        el.themeLabel.textContent = 'Тёмная тема';
+    }
+}
+
+// Restore saved theme
+const savedTheme = localStorage.getItem('theme') || 'light';
+applyTheme(savedTheme);
+
+el.btnTheme.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+// --- Mobile Hamburger Menu ---
+function openSidebar() {
+    el.sidebar.classList.add('open');
+    el.sidebarOverlay.classList.add('active');
+}
+
+function closeSidebar() {
+    el.sidebar.classList.remove('open');
+    el.sidebarOverlay.classList.remove('active');
+}
+
+el.btnHamburger.addEventListener('click', () => {
+    el.sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+});
+
+el.sidebarOverlay.addEventListener('click', closeSidebar);
+
+// Close sidebar on nav click (mobile)
+el.navItems.forEach(item => {
+    item.addEventListener('click', () => closeSidebar());
+});
+
 async function handleLogout() {
     try {
         await apiPost('/auth/logout');
@@ -151,7 +204,7 @@ function renderDashboard(data) {
     } = data;
 
     el.dashboardContent.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="dashboard-grid" style="gap: 1.5rem; margin-bottom: 2rem;">
             <!-- Revenue Card -->
             <div class="glass-panel" style="padding: 1.5rem;">
                 <h3 class="text-muted text-sm" style="margin-bottom: 0.5rem; text-transform: uppercase;">Общая выручка</h3>
@@ -483,7 +536,7 @@ function renderRemindersTable(reminders) {
         el.emptyState.style.display = 'none';
         el.tableBody.innerHTML = reminders.map(r => `
         <tr>
-                <td><span class="badge ${r.status === 'done' ? 'success' : 'in_progress'}">${r.status.toUpperCase()}</span></td>
+                <td><span class="badge ${r.status === 'done' ? 'success' : 'in_progress'}">${translateStatus(r.status)}</span></td>
                 <td class="fw-600 ${r.status === 'done' ? 'text-muted' : ''}" style="${r.status === 'done' ? 'text-decoration:line-through' : ''}">${escapeHtml(r.title)}</td>
                 <td>${r.due_at ? new Date(r.due_at).toLocaleString() : 'Без срока'}</td>
                 <td class="actions">
@@ -660,7 +713,7 @@ async function openUsersModal() {
                         <td>${escapeHtml(i.email)}</td>
                         <td><span class="badge in_progress">${i.role}</span></td>
                         <td><span class="badge ${i.accepted_at ? 'success' : 'new'}">${i.accepted_at ? 'Принято' : 'Ожидает'}</span></td>
-                        <td>${!i.accepted_at ? `<input type="text" readonly value="${window.location.origin}/?invite=${i.token}" style="padding:4px; font-size:12px; width:150px; border:1px solid #ddd;" onclick="this.select()">` : '-'}</td>
+                        <td>${!i.accepted_at ? `<input type="text" readonly value="${window.location.origin}/?invite=${i.token}" style="padding:4px; font-size:12px; width:150px; border:1px solid var(--border);" onclick="this.select()">` : '-'}</td>
                     </tr>`).join('')}
                 </tbody>
             </table>
@@ -696,7 +749,7 @@ function openImportModal(type) {
         <form id="form-import" onsubmit="handleImport(event, '${type}')" style="padding: 10px 0;">
             <div class="input-group">
                 <label>Выберите CSV файл</label>
-                <input type="file" id="import-file" accept=".csv" required style="padding: 10px; border: 1px dashed #ccc; width: 100%; border-radius: 6px;">
+                <input type="file" id="import-file" accept=".csv" required style="padding: 10px; border: 1px dashed var(--border); width: 100%; border-radius: 6px;">
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
                 <button type="button" class="btn btn-outline" onclick="closeModal()">Отмена</button>
@@ -756,12 +809,12 @@ async function viewOrder(id) {
         const { order, client, balance, payments } = summary;
 
         let html = `
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+            <div style="background: var(--bg-surface); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border);">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div><span class="text-muted text-sm">Название</span><br><span class="fw-600">${escapeHtml(order.title)}</span></div>
                     <div><span class="text-muted text-sm">Клиент</span><br><span>${escapeHtml(client.name)}</span></div>
                     <div><span class="text-muted text-sm">Стоимость</span><br><span style="font-size: 1.1rem; font-weight: bold;">${formatMoney(order.price)} ₽</span></div>
-                    <div><span class="text-muted text-sm">Баланс (Долг)</span><br><span style="color: ${balance > 0 ? '#ef4444' : '#10b981'}; font-weight: bold;">${formatMoney(balance)} ₽</span></div>
+                    <div><span class="text-muted text-sm">Баланс (Долг)</span><br><span style="color: ${balance > 0 ? 'var(--danger)' : 'var(--success)'}; font-weight: bold;">${formatMoney(balance)} ₽</span></div>
                 </div>
             </div>
 
@@ -782,10 +835,10 @@ async function viewOrder(id) {
                 </tbody>
             </table>
 
-            <form onsubmit="handleAddPayment(event, ${order.id})" style="display: flex; gap: 10px; background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 8px; align-items: flex-end;">
+            <form onsubmit="handleAddPayment(event, ${order.id})" style="display: flex; gap: 10px; background: var(--bg-surface); padding: 10px; border: 1px solid var(--border); border-radius: 8px; align-items: flex-end;">
                 <div style="flex-grow: 1;">
                     <label style="font-size: 12px; margin-bottom: 4px; display: block;">Добавить платеж</label>
-                    <input type="number" id="new-payment-amount" step="0.01" min="0.01" max="${balance > 0 ? balance : ''}" placeholder="Сумма" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <input type="number" id="new-payment-amount" step="0.01" min="0.01" max="${balance > 0 ? balance : ''}" placeholder="Сумма" required style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
                 </div>
                 <button type="submit" class="btn btn-primary" ${balance <= 0 ? 'disabled' : ''}>Оплатить</button>
             </form>
@@ -902,6 +955,17 @@ function escapeHtml(unsafe) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+function translateStatus(status) {
+    const map = {
+        'new': 'Новый',
+        'in_progress': 'В работе',
+        'done': 'Выполнен',
+        'canceled': 'Отменён',
+        'pending': 'Ожидает'
+    };
+    return map[status] || status;
 }
 
 function formatMoney(num) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3] - 2026-03-04
+### Added
+- **Dark Mode**: Full dark theme with CSS variable overrides, toggle button in sidebar, persists via localStorage.
+- **Responsive Layout**: Mobile-friendly sidebar as overlay drawer with hamburger menu button at <768px.
+- **Adaptive Tables**: Horizontal scroll for data tables on narrow screens.
+- **Skeleton Loading**: CSS-based shimmer animation for loading states.
+
 ## [0.3.2] - 2026-02-23
 ### Added
 - **Analytics Dashboard**: New widgets for revenue, debt, order statistics, and recent activity logic.

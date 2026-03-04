@@ -3,6 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from ..schemas.base import APIModel, Money
+from ..schemas.client import ClientOut
+from ..schemas.payment import PaymentOut
 
 class OrderStatus(str):
     new = "new"
@@ -33,7 +35,7 @@ class OrderPriceUpdate(APIModel):
     price: Money
 
 class OrderSummaryOut(APIModel):
-    order_id: int
-    price: Money
-    paid_total: Money
+    order: OrderOut
+    client: ClientOut
     balance: Money
+    payments: list[PaymentOut]

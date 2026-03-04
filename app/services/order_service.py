@@ -91,19 +91,22 @@ class OrderService:
 
     def get_summary(self, order_id: int):
         o = self.get_order(order_id)
-        paid_raw = self.db.execute(
-            select(func.coalesce(func.sum(Payment.amount), 0))
-            .where(Payment.order_id == order_id, Payment.tenant_id == self.tenant_id)
+        client = self.db.execute(
+            select(Client).where(Client.id == o.client_id, Client.tenant_id == self.tenant_id)
         ).scalar_one()
 
-        paid = Decimal(str(paid_raw))
+        payments = self.db.execute(
+            select(Payment).where(Payment.order_id == order_id, Payment.tenant_id == self.tenant_id).order_by(Payment.created_at.desc())
+        ).scalars().all()
+
+        paid = sum([Decimal(str(p.amount)) for p in payments])
         price = Decimal(str(o.price))
         
         return {
-            "order_id": o.id,
-            "price": price,
-            "paid_total": paid,
+            "order": o,
+            "client": client,
             "balance": price - paid,
+            "payments": payments,
         }
 
     def update_status(self, order_id: int, status: str):
