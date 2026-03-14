@@ -1,0 +1,7 @@
+[
+  {"action": "goto", "url": "http://127.0.0.1:8000/"},
+  {"action": "fill", "selector": "#login-email", "text": "owner@example.com"},
+  {"action": "fill", "selector": "#login-password", "text": "password123"},
+  {"action": "click", "selector": "button.btn-primary"},
+  {"action": "wait", "wait": 3}
+]

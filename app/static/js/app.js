@@ -5,7 +5,8 @@ const API_BASE = '/api/v1';
 const state = {
     token: localStorage.getItem('access_token') || null,
     user: null,
-    currentView: 'login' // 'login', 'clients', 'orders'
+    currentView: 'login', // 'login', 'clients', 'orders'
+    taskViewMode: 'table' // 'table', 'kanban'
 };
 
 // Elements
@@ -33,7 +34,9 @@ const el = {
     themeIconMoon: document.getElementById('theme-icon-moon'),
     btnHamburger: document.getElementById('btn-hamburger'),
     sidebar: document.getElementById('sidebar'),
-    sidebarOverlay: document.getElementById('sidebar-overlay')
+    sidebarOverlay: document.getElementById('sidebar-overlay'),
+    viewKanban: document.getElementById('kanban-view'),
+    kanbanContainer: document.getElementById('kanban-container'),
 };
 
 // --- Initialization ---
@@ -70,6 +73,7 @@ function switchView(target) {
         });
 
         // Toggle containers
+        el.viewKanban.style.display = 'none'; // Ensure Kanban is hidden by default
         if (target === 'dashboard') {
             el.tableContainer.style.display = 'none';
             el.dashboardContent.style.display = 'block';
@@ -79,8 +83,9 @@ function switchView(target) {
             el.dashboardContent.style.display = 'none';
             if (target === 'clients') loadClients();
             else if (target === 'orders') loadOrders();
+            else if (target === 'catalog') loadCatalog();
             else if (target === 'activity') loadActivity();
-            else if (target === 'reminders') loadReminders();
+            else if (target === 'reminders') loadTasks();
             else if (target === 'settings') loadSettings();
         }
     }
@@ -205,10 +210,16 @@ function renderDashboard(data) {
 
     el.dashboardContent.innerHTML = `
         <div class="dashboard-grid" style="gap: 1.5rem; margin-bottom: 2rem;">
-            <!-- Revenue Card -->
+            <!-- Total Revenue Card -->
             <div class="glass-panel" style="padding: 1.5rem;">
-                <h3 class="text-muted text-sm" style="margin-bottom: 0.5rem; text-transform: uppercase;">Общая выручка</h3>
-                <div style="font-size: 2rem; font-weight: 700; color: var(--success);">${formatMoney(total_revenue)} ₽</div>
+                <h3 class="text-muted text-sm" style="margin-bottom: 0.5rem; text-transform: uppercase;">Объем заказов</h3>
+                <div style="font-size: 2rem; font-weight: 700;">${formatMoney(total_revenue)} ₽</div>
+            </div>
+
+            <!-- Paid Card -->
+            <div class="glass-panel" style="padding: 1.5rem;">
+                <h3 class="text-muted text-sm" style="margin-bottom: 0.5rem; text-transform: uppercase;">Оплачено</h3>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--success);">${formatMoney(data.total_paid || 0)} ₽</div>
             </div>
             
             <!-- Debt Card -->
@@ -221,12 +232,6 @@ function renderDashboard(data) {
             <div class="glass-panel" style="padding: 1.5rem;">
                 <h3 class="text-muted text-sm" style="margin-bottom: 0.5rem; text-transform: uppercase;">Заказы в работе</h3>
                 <div style="font-size: 2rem; font-weight: 700;">${active_orders} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 500;">/ ${total_orders} всего</span></div>
-            </div>
-            
-            <!-- Clients Card -->
-            <div class="glass-panel" style="padding: 1.5rem;">
-                <h3 class="text-muted text-sm" style="margin-bottom: 0.5rem; text-transform: uppercase;">Всего клиентов</h3>
-                <div style="font-size: 2rem; font-weight: 700;">${total_clients}</div>
             </div>
         </div>
 
@@ -368,6 +373,7 @@ async function deleteClient(id) {
 
 // --- Orders Module ---
 let cachedClients = [];
+let cachedProducts = [];
 async function loadOrders() {
     el.pageTitle.textContent = "Заказы";
     el.pageSubtitle.textContent = "Текущие проекты и сделки";
@@ -380,11 +386,13 @@ async function loadOrders() {
     `;
 
     try {
-        const [orders, clients] = await Promise.all([
+        const [orders, clients, products] = await Promise.all([
             apiGet('/orders'),
-            apiGet('/clients')
+            apiGet('/clients'),
+            apiGet('/products').catch(() => [])
         ]);
         cachedClients = clients;
+        cachedProducts = products;
         renderOrdersTable(orders);
     } catch (e) {
         showToast('Ошибка загрузки заказов', 'error');
@@ -452,9 +460,20 @@ function openCreateOrderModal() {
                 <label>Название заказа</label>
                 <input type="text" id="order-title" required>
             </div>
+            
             <div class="input-group">
-                <label>Стоимость (₽)</label>
-                <input type="number" id="order-price" step="0.01" min="0" value="0.00" required>
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Позиции заказа</span>
+                    <button type="button" class="btn btn-outline" onclick="addOrderItemRow()" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">+ Добавить позицию</button>
+                </label>
+                <div id="order-items-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+                </div>
+            </div>
+
+            <div class="input-group" style="margin-top: 1rem;">
+                <label>Итоговая стоимость (₽)</label>
+                <input type="number" id="order-price" step="0.01" min="0" value="0.00" readonly style="background: var(--bg-body); cursor: not-allowed;">
+                <small class="text-muted" style="display:block; margin-top: 0.25rem;">Рассчитывается автоматически</small>
             </div>
             <div class="input-group">
                 <label>Комментарий</label>
@@ -466,16 +485,87 @@ function openCreateOrderModal() {
             </div>
         </form>
     `);
+
+    setTimeout(() => {
+        addOrderItemRow();
+    }, 10);
+}
+
+function addOrderItemRow() {
+    const container = document.getElementById('order-items-container');
+    if (!container) return;
+
+    const rowId = 'oi-' + Date.now() + Math.floor(Math.random() * 1000);
+
+    // Build product options for the dropdown
+    const productOpts = cachedProducts
+        .filter(p => p.is_active)
+        .map(p => `<option value="${p.id}" data-name="${escapeHtml(p.name)}" data-price="${p.price}">${escapeHtml(p.name)} — ${formatMoney(p.price)} ₽</option>`)
+        .join('');
+
+    const html = `
+        <div class="order-item-row" id="${rowId}" style="display: flex; flex-direction: column; gap: 0.35rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <select class="oi-catalog" style="flex:2; padding:0.4rem;" onchange="fillFromCatalog(this, '${rowId}')">
+                    <option value="">— Из каталога —</option>
+                    ${productOpts}
+                </select>
+                <button type="button" class="btn-close" style="color: var(--danger); font-size: 1.2rem; cursor: pointer; padding: 0 0.25rem;" onclick="document.getElementById('${rowId}').remove(); recalcOrderTotal();">×</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.5rem; align-items: center;">
+                <input type="text" class="oi-title" placeholder="Услуга/товар" required>
+                <input type="number" class="oi-qty" value="1" min="0.01" step="0.01" placeholder="Кол-во" required oninput="recalcOrderTotal()">
+                <input type="number" class="oi-price" value="0.00" min="0" step="0.01" placeholder="Цена" required oninput="recalcOrderTotal()">
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+    recalcOrderTotal();
+}
+
+function fillFromCatalog(selectEl, rowId) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt || !opt.value) return;
+    row.querySelector('.oi-title').value = opt.dataset.name;
+    row.querySelector('.oi-price').value = parseFloat(opt.dataset.price).toFixed(2);
+    recalcOrderTotal();
+}
+
+function recalcOrderTotal() {
+    const rows = document.querySelectorAll('.order-item-row');
+    let total = 0;
+    rows.forEach(row => {
+        const qty = parseFloat(row.querySelector('.oi-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.oi-price').value) || 0;
+        total += (qty * price);
+    });
+    const priceInput = document.getElementById('order-price');
+    if (priceInput) {
+        priceInput.value = total.toFixed(2);
+    }
 }
 
 async function handleCreateOrder(e) {
     e.preventDefault();
+
+    const items = [];
+    document.querySelectorAll('.order-item-row').forEach(row => {
+        items.push({
+            title: row.querySelector('.oi-title').value,
+            quantity: row.querySelector('.oi-qty').value,
+            unit_price: row.querySelector('.oi-price').value
+        });
+    });
+
     const payload = {
         client_id: parseInt(document.getElementById('order-client').value),
         title: document.getElementById('order-title').value,
         price: document.getElementById('order-price').value,
         comment: document.getElementById('order-comment').value || null,
-        status: 'new'
+        status: 'new',
+        items: items
     };
 
     try {
@@ -500,104 +590,237 @@ async function deleteOrder(id) {
 }
 
 
-// --- Reminders Module ---
-async function loadReminders() {
-    el.pageTitle.textContent = "Задачи";
-    el.pageSubtitle.textContent = "Ваши напоминания и ToDo";
+// --- Tasks Module ---
+let cachedOrders = [];
+
+async function loadTasks() {
+    el.pageTitle.textContent = 'Задачи';
+    el.pageSubtitle.textContent = 'Задачи по заказам и проектам';
+
+    // Page Actions with Toggle
     el.pageActions.innerHTML = `
-        <button class="btn btn-primary" onclick="openCreateReminderModal()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Добавить
-        </button>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="view-toggle-btn">
+                <button class="${state.taskViewMode === 'table' ? 'active' : ''}" onclick="switchTaskView('table')">Список</button>
+                <button class="${state.taskViewMode === 'kanban' ? 'active' : ''}" onclick="switchTaskView('kanban')">Доска</button>
+            </div>
+            <button class="btn btn-primary" onclick="openCreateTaskModal()">+ Новая задача</button>
+        </div>
     `;
 
     try {
-        const reminders = await apiGet('/reminders');
-        renderRemindersTable(reminders);
+        const [tasks, orders] = await Promise.all([
+            apiGet('/tasks'),
+            apiGet('/orders').catch(() => [])
+        ]);
+        cachedOrders = orders;
+
+        if (state.taskViewMode === 'kanban') {
+            renderTaskKanban(tasks);
+        } else {
+            renderTasksTable(tasks);
+        }
     } catch (e) {
         showToast('Ошибка загрузки задач', 'error');
     }
 }
 
-function renderRemindersTable(reminders) {
-    el.tableHead.innerHTML = `
-        <tr>
-            <th>Статус</th>
-            <th>Текст</th>
-            <th>Срок</th>
-            <th>Действия</th>
-        </tr>
-        `;
-
-    if (reminders.length === 0) {
-        el.tableBody.innerHTML = '';
-        el.emptyState.style.display = 'block';
-    } else {
-        el.emptyState.style.display = 'none';
-        el.tableBody.innerHTML = reminders.map(r => `
-        <tr>
-                <td><span class="badge ${r.status === 'done' ? 'success' : 'in_progress'}">${translateStatus(r.status)}</span></td>
-                <td class="fw-600 ${r.status === 'done' ? 'text-muted' : ''}" style="${r.status === 'done' ? 'text-decoration:line-through' : ''}">${escapeHtml(r.title)}</td>
-                <td>${r.due_at ? new Date(r.due_at).toLocaleString() : 'Без срока'}</td>
-                <td class="actions">
-                    ${r.status !== 'done' ? `<button class="btn btn-sm btn-outline" onclick="completeReminder(${r.id})">Выполнить</button>` : ''}
-                    <button class="btn btn-sm btn-outline btn-danger" onclick="deleteReminder(${r.id})">Удалить</button>
-                </td>
-            </tr>
-        `).join('');
-    }
+function switchTaskView(mode) {
+    state.taskViewMode = mode;
+    loadTasks();
 }
 
-function openCreateReminderModal() {
+function renderTaskKanban(tasks) {
+    el.tableContainer.style.display = 'none';
+    el.viewKanban.style.display = 'block';
+
+    const columns = [
+        { id: 'new', title: 'Новое', icon: '✨' },
+        { id: 'in_progress', title: 'В работе', icon: '⚡' },
+        { id: 'done', title: 'Готово', icon: '🎉' }
+    ];
+
+    el.kanbanContainer.innerHTML = columns.map(col => {
+        const colTasks = tasks.filter(t => t.status === col.id);
+        return `
+            <div class="kanban-column" data-status="${col.id}">
+                <div class="kanban-column-header">
+                    <h4>${col.icon} ${col.title}</h4>
+                    <span class="kanban-column-count">${colTasks.length}</span>
+                </div>
+                <div class="kanban-column-content" id="kanban-col-${col.id}">
+                    ${colTasks.length === 0 ? `
+                        <div class="text-muted text-sm text-center" style="padding: 3rem 1rem; opacity: 0.5;">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🏜️</div>
+                            Здесь пока пусто
+                        </div>
+                    ` : ''}
+                    ${colTasks.map(t => {
+            const next = nextTaskStatus(t.status);
+            const dueDate = t.due_date ? new Date(t.due_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : 'Без срока';
+            return `
+                            <div class="kanban-card">
+                                <span class="kanban-card-title">${escapeHtml(t.title)}</span>
+                                ${t.order_title ? `<a href="#" class="kanban-card-order" onclick="viewOrder(${t.order_id}); return false;">📦 ${escapeHtml(t.order_title)}</a>` : ''}
+                                <div class="kanban-card-meta">
+                                    <div class="kanban-card-date">
+                                        <span>📅</span>
+                                        <span>${dueDate}</span>
+                                    </div>
+                                    <span class="kanban-card-id">#${t.id}</span>
+                                </div>
+                                <div class="kanban-card-actions">
+                                    ${next ? `<button class="btn btn-xs btn-primary" onclick="advanceTask(${t.id}, '${next}')">👉 ${translateTaskStatus(next)}</button>` : ''}
+                                    <button class="btn btn-xs btn-outline" style="color:var(--danger);" onclick="deleteTask(${t.id})">🗑️</button>
+                                </div>
+                            </div>
+                        `;
+        }).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function translateTaskStatus(s) {
+    return { 'new': 'Новая', 'in_progress': 'В работе', 'done': 'Готово' }[s] || s;
+}
+
+function taskStatusBadge(s) {
+    const cls = { 'new': 'badge-info', 'in_progress': 'badge-warning', 'done': 'badge-success' }[s] || '';
+    return `<span class="badge ${cls}">${translateTaskStatus(s)}</span>`;
+}
+
+function nextTaskStatus(s) {
+    return { 'new': 'in_progress', 'in_progress': 'done' }[s] || null;
+}
+
+function renderTasksTable(tasks) {
+    el.tableContainer.style.display = 'block';
+    el.viewKanban.style.display = 'none';
+    el.tableHead.innerHTML = `<tr><th>ЗАДАЧА</th><th>ЗАКАЗ</th><th>СТАТУС</th><th>ДЕДЛАЙН</th><th>ДЕЙСТВИЯ</th></tr>`;
+
+    if (!tasks.length) {
+        el.tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--text-muted);">Нет задач. Создайте первую!</td></tr>';
+        el.emptyState.style.display = 'none';
+        return;
+    }
+    el.emptyState.style.display = 'none';
+
+    el.tableBody.innerHTML = tasks.map(t => {
+        const next = nextTaskStatus(t.status);
+        const advanceBtn = next ? `<button class="btn btn-sm btn-outline" onclick="advanceTask(${t.id}, '${next}')">${translateTaskStatus(next)}</button>` : '';
+        return `
+        <tr style="${t.status === 'done' ? 'opacity:0.5;' : ''}">
+            <td class="fw-600 ${t.status === 'done' ? 'text-muted' : ''}" style="${t.status === 'done' ? 'text-decoration:line-through' : ''}">${escapeHtml(t.title)}</td>
+            <td>${t.order_title ? `<a href="#" onclick="viewOrder(${t.order_id}); return false;" style="color:var(--primary);">${escapeHtml(t.order_title)}</a>` : '<span class="text-muted">—</span>'}</td>
+            <td>${taskStatusBadge(t.status)}</td>
+            <td>${t.due_date ? new Date(t.due_date).toLocaleDateString('ru-RU') : '<span class="text-muted">—</span>'}</td>
+            <td>
+                ${advanceBtn}
+                <button class="btn btn-sm btn-outline" style="color:var(--danger); border-color:var(--danger);" onclick="deleteTask(${t.id})">Удалить</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function openCreateTaskModal(preselectedOrderId) {
+    const orderOptions = cachedOrders.map(o => `<option value="${o.id}" ${o.id === preselectedOrderId ? 'selected' : ''}>${escapeHtml(o.title)}</option>`).join('');
+
     showModal(`
         <div class="modal-header">
             <h3>Новая задача</h3>
             <button class="btn-close" onclick="closeModal()">×</button>
         </div>
-        <form id="form-create-reminder" onsubmit="handleCreateReminder(event)">
+        <form id="form-create-task" onsubmit="handleCreateTask(event)">
             <div class="input-group">
-                <label>Описание задачи</label>
-                <input type="text" id="rem-title" required>
+                <label>Название задачи</label>
+                <input type="text" id="task-title" required maxlength="300">
             </div>
             <div class="input-group">
-                <label>Срок выполнения (необязательно)</label>
-                <input type="datetime-local" id="rem-due">
+                <label>Описание</label>
+                <textarea id="task-description" rows="2" maxlength="2000"></textarea>
+            </div>
+            <div class="input-group">
+                <label>Привязка к заказу</label>
+                <select id="task-order">
+                    <option value="">— Без привязки —</option>
+                    ${orderOptions}
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Дедлайн</label>
+                <input type="date" id="task-due">
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
                 <button type="button" class="btn btn-outline" onclick="closeModal()">Отмена</button>
-                <button type="submit" class="btn btn-primary">Сохранить</button>
+                <button type="submit" class="btn btn-primary">Создать</button>
             </div>
         </form>
     `);
 }
 
-async function handleCreateReminder(e) {
+async function handleCreateTask(e) {
     e.preventDefault();
-    let due = document.getElementById('rem-due').value;
-    if (due) due = new Date(due).toISOString();
-
+    const due = document.getElementById('task-due').value;
+    const orderId = document.getElementById('task-order').value;
+    const payload = {
+        title: document.getElementById('task-title').value,
+        description: document.getElementById('task-description').value || null,
+        order_id: orderId ? parseInt(orderId) : null,
+        due_date: due ? new Date(due).toISOString() : null
+    };
     try {
-        await apiPost('/reminders', { title: document.getElementById('rem-title').value, due_at: due || null });
+        await apiPost('/tasks', payload);
         closeModal();
         showToast('Задача создана', 'success');
-        loadReminders();
+        loadTasks();
     } catch (err) {
+        showToast(err.message || 'Ошибка создания', 'error');
+    }
+}
+
+async function advanceTask(id, newStatus) {
+    try {
+        await apiPut(`/tasks/${id}`, { status: newStatus });
+        if (state.currentView === 'reminders') loadTasks();
+        showToast('Статус обновлён', 'success');
+    } catch (e) {
         showToast('Ошибка', 'error');
     }
 }
 
-async function completeReminder(id) {
+async function deleteTask(id) {
+    if (!confirm('Удалить эту задачу?')) return;
     try {
-        await apiFetch(`/reminders/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'done' }) });
-        loadReminders();
-    } catch (e) { showToast('Ошибка', 'error'); }
+        await apiDelete(`/tasks/${id}`);
+        showToast('Задача удалена', 'success');
+        loadTasks();
+    } catch (e) {
+        showToast('Ошибка', 'error');
+    }
 }
 
-async function deleteReminder(id) {
+async function loadOrderTasks(orderId) {
+    const container = document.getElementById('order-tasks-list');
+    if (!container) return;
     try {
-        await apiDelete(`/reminders/${id}`);
-        loadReminders();
-    } catch (e) { showToast('Ошибка', 'error'); }
+        const tasks = await apiGet(`/tasks?order_id=${orderId}`);
+        if (!tasks.length) {
+            container.innerHTML = '<span class="text-muted">Нет задач</span>';
+            return;
+        }
+        container.innerHTML = tasks.map(t => {
+            const next = nextTaskStatus(t.status);
+            const advBtn = next ? `<button class="btn btn-sm btn-outline" onclick="advanceTask(${t.id}, '${next}'); setTimeout(() => loadOrderTasks(${orderId}), 300);" style="padding:0.1rem 0.4rem; font-size:0.75rem;">${translateTaskStatus(next)}</button>` : '';
+            return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+                <span class="${t.status === 'done' ? 'text-muted' : ''}" style="${t.status === 'done' ? 'text-decoration:line-through;' : ''}">${escapeHtml(t.title)}</span>
+                <span style="display:flex; gap:0.3rem; align-items:center;">${taskStatusBadge(t.status)} ${advBtn}</span>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        container.innerHTML = '<span class="text-muted">Ошибка загрузки</span>';
+    }
 }
 
 // --- Activity Module ---
@@ -637,7 +860,7 @@ async function loadSettings() {
     el.pageSubtitle.textContent = "Управление, импорт и экспорт данных";
     el.pageActions.innerHTML = ``;
 
-    el.tableHead.innerHTML = `<tr><th>Функция</th><th>Описание</th><th>Действие</th></tr>`;
+    el.tableHead.innerHTML = `<tr><th>Функция</th><th>Описание</th><th>Действие</th></tr> `;
     el.emptyState.style.display = 'none';
 
     el.tableBody.innerHTML = `
@@ -687,8 +910,8 @@ async function openUsersModal() {
         ]);
 
         let html = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h4 style="margin:0;">Активные пользователи</h4>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h4 style="margin:0;">Активные пользователи</h4>
             </div>
             <table class="data-table" style="margin-bottom: 30px;">
                 <thead><tr><th>Email</th><th>Роль</th><th>Создан</th></tr></thead>
@@ -717,13 +940,13 @@ async function openUsersModal() {
                     </tr>`).join('')}
                 </tbody>
             </table>
-        `;
+    `;
         document.getElementById('users-modal-content').innerHTML = html;
         document.getElementById('users-modal-content').className = ''; // remove centering
     } catch (e) {
         document.getElementById('users-modal-content').innerHTML = `
-            <p class="text-danger" style="margin-top: 20px;">У вас нет прав администратора для просмотра пользователей.</p>
-        `;
+        <p class="text-danger" style="margin-top: 20px;">У вас нет прав администратора для просмотра пользователей.</p>
+            `;
     }
 }
 
@@ -742,7 +965,7 @@ async function createInvite() {
 function openImportModal(type) {
     const typeLabel = type === 'clients' ? 'клиентов' : 'заказов';
     showModal(`
-        <div class="modal-header">
+            <div class="modal-header">
             <h3>Загрузка ${typeLabel} (CSV)</h3>
             <button class="btn-close" onclick="closeModal()">×</button>
         </div>
@@ -774,7 +997,7 @@ async function handleImport(e, type) {
     btn.disabled = true;
 
     try {
-        const res = await fetch(`${API_BASE}/imports/${type}/csv`, {
+        const res = await fetch(`${API_BASE} /imports/${type}/csv`, {
             method: 'POST',
             body: formData,
             headers: { 'Authorization': `Bearer ${state.token}` }
@@ -819,6 +1042,23 @@ async function viewOrder(id) {
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="margin:0;">Состав заказа</h4>
+            </div>
+            
+            <table class="data-table" style="margin-bottom: 20px;">
+                <thead><tr><th>Название</th><th>Кол-во</th><th>Цена шт.</th><th>Сумма</th></tr></thead>
+                <tbody>
+                    ${(!order.items || order.items.length === 0) ? `<tr><td colspan="4" class="text-center text-muted">Нет позиций</td></tr>` : ''}
+                    ${(order.items || []).map(i => `<tr>
+                        <td class="fw-600">${escapeHtml(i.title)}</td>
+                        <td>${i.quantity}</td>
+                        <td>${formatMoney(i.unit_price)} ₽</td>
+                        <td class="fw-600">${formatMoney(i.total_price)} ₽</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h4 style="margin:0;">Платежи</h4>
             </div>
             
@@ -842,9 +1082,18 @@ async function viewOrder(id) {
                 </div>
                 <button type="submit" class="btn btn-primary" ${balance <= 0 ? 'disabled' : ''}>Оплатить</button>
             </form>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px;">
+                <h4 style="margin:0;">Задачи по заказу</h4>
+                <button class="btn btn-outline btn-sm" onclick="openCreateTaskModal(${order.id})" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">+ Задача</button>
+            </div>
+            <div id="order-tasks-list" style="font-size: 0.9rem; color: var(--text-muted);">Загрузка...</div>
         `;
         document.getElementById('order-details-content').innerHTML = html;
         document.getElementById('order-details-content').className = '';
+
+        // Load tasks for this order
+        loadOrderTasks(order.id);
     } catch (e) {
         document.getElementById('order-details-content').innerHTML = `<p class="text-danger">Ошибка загрузки заказа</p>`;
     }
@@ -909,6 +1158,7 @@ async function apiFetch(url, options = {}) {
 
 const apiGet = (url) => apiFetch(url, { method: 'GET' });
 const apiPost = (url, body) => apiFetch(url, { method: 'POST', body: JSON.stringify(body) });
+const apiPut = (url, body) => apiFetch(url, { method: 'PUT', body: JSON.stringify(body) });
 const apiDelete = (url) => apiFetch(url, { method: 'DELETE' });
 
 
@@ -970,6 +1220,153 @@ function translateStatus(status) {
 
 function formatMoney(num) {
     return Number(num).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// --- Catalog Module ---
+async function loadCatalog() {
+    el.pageTitle.textContent = 'Каталог';
+    el.pageSubtitle.textContent = 'Товары и услуги для быстрого добавления в заказы';
+    el.pageActions.innerHTML = `<button class="btn btn-primary" onclick="openCreateProductModal()">+ Добавить товар</button>`;
+
+    try {
+        const products = await apiGet('/products?include_inactive=true');
+        cachedProducts = products;
+        renderCatalogTable(products);
+    } catch (err) {
+        showToast('Ошибка загрузки каталога', 'error');
+    }
+}
+
+function renderCatalogTable(products) {
+    el.tableHead.innerHTML = `<tr><th>НАИМЕНОВАНИЕ</th><th>ОПИСАНИЕ</th><th>ЦЕНА</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr>`;
+
+    if (!products.length) {
+        el.tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--text-muted);">Каталог пуст. Добавьте первый товар или услугу.</td></tr>';
+        return;
+    }
+
+    el.tableBody.innerHTML = products.map(p => `
+        <tr>
+            <td class="fw-600">${escapeHtml(p.name)}</td>
+            <td class="text-muted">${escapeHtml(p.description || '—')}</td>
+            <td>${formatMoney(p.price)} ₽</td>
+            <td><span class="badge ${p.is_active ? 'badge-success' : 'badge-muted'}">${p.is_active ? 'Активен' : 'Архив'}</span></td>
+            <td>
+                <button class="btn btn-outline btn-sm" onclick="openEditProductModal(${p.id})">Ред.</button>
+                <button class="btn btn-outline btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="deleteProduct(${p.id})">Удалить</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openCreateProductModal() {
+    showModal(`
+        <div class="modal-header">
+            <h3>Новый товар / услуга</h3>
+            <button class="btn-close" onclick="closeModal()">×</button>
+        </div>
+        <form id="form-create-product" onsubmit="handleCreateProduct(event)">
+            <div class="input-group">
+                <label>Наименование</label>
+                <input type="text" id="product-name" required maxlength="200">
+            </div>
+            <div class="input-group">
+                <label>Описание</label>
+                <textarea id="product-description" rows="2" maxlength="1000"></textarea>
+            </div>
+            <div class="input-group">
+                <label>Базовая цена (₽)</label>
+                <input type="number" id="product-price" step="0.01" min="0" value="0.00" required>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Отмена</button>
+                <button type="submit" class="btn btn-primary">Создать</button>
+            </div>
+        </form>
+    `);
+}
+
+async function handleCreateProduct(e) {
+    e.preventDefault();
+    const payload = {
+        name: document.getElementById('product-name').value,
+        description: document.getElementById('product-description').value || null,
+        price: document.getElementById('product-price').value
+    };
+    try {
+        await apiPost('/products', payload);
+        closeModal();
+        showToast('Товар добавлен в каталог', 'success');
+        loadCatalog();
+    } catch (err) {
+        showToast(err.message || 'Ошибка создания', 'error');
+    }
+}
+
+function openEditProductModal(id) {
+    const product = cachedProducts.find(p => p.id === id);
+    if (!product) return;
+
+    showModal(`
+        <div class="modal-header">
+            <h3>Редактировать товар</h3>
+            <button class="btn-close" onclick="closeModal()">×</button>
+        </div>
+        <form id="form-edit-product" onsubmit="handleEditProduct(event, ${id})">
+            <div class="input-group">
+                <label>Наименование</label>
+                <input type="text" id="product-name" value="${escapeHtml(product.name)}" required maxlength="200">
+            </div>
+            <div class="input-group">
+                <label>Описание</label>
+                <textarea id="product-description" rows="2" maxlength="1000">${escapeHtml(product.description || '')}</textarea>
+            </div>
+            <div class="input-group">
+                <label>Базовая цена (₽)</label>
+                <input type="number" id="product-price" step="0.01" min="0" value="${product.price}" required>
+            </div>
+            <div class="input-group">
+                <label>Статус</label>
+                <select id="product-active">
+                    <option value="true" ${product.is_active ? 'selected' : ''}>Активен</option>
+                    <option value="false" ${!product.is_active ? 'selected' : ''}>Архив</option>
+                </select>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Отмена</button>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+        </form>
+    `);
+}
+
+async function handleEditProduct(e, id) {
+    e.preventDefault();
+    const payload = {
+        name: document.getElementById('product-name').value,
+        description: document.getElementById('product-description').value || null,
+        price: document.getElementById('product-price').value,
+        is_active: document.getElementById('product-active').value === 'true'
+    };
+    try {
+        await apiPut(`/products/${id}`, payload);
+        closeModal();
+        showToast('Товар обновлён', 'success');
+        loadCatalog();
+    } catch (err) {
+        showToast(err.message || 'Ошибка обновления', 'error');
+    }
+}
+
+async function deleteProduct(id) {
+    if (!confirm('Удалить этот товар из каталога?')) return;
+    try {
+        await apiDelete(`/products/${id}`);
+        showToast('Товар удалён', 'success');
+        loadCatalog();
+    } catch (err) {
+        showToast(err.message || 'Ошибка удаления', 'error');
+    }
 }
 
 // Start sequence

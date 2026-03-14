@@ -11,6 +11,8 @@ from .activity import router as activity_router
 from .export import router as export_router
 from .imports import router as imports_router
 from .analytics import router as analytics_router
+from .products import router as products_router
+from .tasks import router as tasks_router
 
 api_router = APIRouter()
 
@@ -25,3 +27,5 @@ api_router.include_router(activity_router, prefix="/activity")
 api_router.include_router(export_router, prefix="/export")
 api_router.include_router(imports_router, prefix="/import")
 api_router.include_router(analytics_router, prefix="/analytics")
+api_router.include_router(products_router, prefix="/products")
+api_router.include_router(tasks_router, prefix="/tasks")
