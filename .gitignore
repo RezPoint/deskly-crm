@@ -206,3 +206,24 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Go бинарники
+deskly_server.exe
+deskly_server
+
+# Node
+go-backend/frontend/node_modules/
+go-backend/frontend/dist/
+
+# Логи сервера
+server.log
+server_err.log
+
+# Артефакты отладки агента
+agent_vision.py
+agent_workflow.py
+*_workflow.json
+current_view.png
+step_*.png
+workflow_result.png
+.worktrees/
