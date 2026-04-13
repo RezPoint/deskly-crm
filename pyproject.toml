@@ -13,7 +13,7 @@ authors = [
   { name = "RezPoint" }
 ]
 dependencies = [
-  "fastapi>=0.110",
+  "fastapi>=0.135.3",
   "uvicorn[standard]>=0.29",
   "sqlalchemy>=2.0",
   "jinja2>=3.1",
