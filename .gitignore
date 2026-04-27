@@ -223,6 +223,7 @@ server_err.log
 agent_vision.py
 agent_workflow.py
 *_workflow.json
+workflow.json
 current_view.png
 step_*.png
 workflow_result.png
