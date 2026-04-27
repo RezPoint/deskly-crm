@@ -2,11 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"deskly-crm-go/internal/domain"
-	"gorm.io/gorm"
 	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
 )
 
 type PaymentHandler struct {
@@ -38,6 +39,8 @@ func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	logActivity(h.db, 1, "payment", "order", req.OrderID, fmt.Sprintf("Оплата %s ₽ по заказу #%d", req.Amount.String(), req.OrderID))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(payment)

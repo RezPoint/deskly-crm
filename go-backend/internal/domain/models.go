@@ -74,11 +74,18 @@ type Product struct {
 
 type Task struct {
 	BaseEntity
-	OrderID     uint      `gorm:"index" json:"order_id"`
-	Title       string    `gorm:"size:300;not null" json:"title"`
-	Description string    `gorm:"type:text" json:"description"`
-	Status      string    `gorm:"size:30;not null;default:'new'" json:"status"`
+	OrderID     uint       `gorm:"index" json:"order_id"`
+	ClientID    uint       `gorm:"index" json:"client_id"`
+	Title       string     `gorm:"size:300;not null" json:"title"`
+	Description string     `gorm:"type:text" json:"description"`
+	Status      string     `gorm:"size:30;not null;default:'new'" json:"status"`
 	DueDate     *time.Time `gorm:"index" json:"due_date"`
+}
+
+type OrderComment struct {
+	BaseEntity
+	OrderID uint   `gorm:"not null;index" json:"order_id"`
+	Message string `gorm:"type:text;not null" json:"message"`
 }
 
 type ActivityLog struct {

@@ -6,6 +6,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Orders } from './pages/Orders';
 import { Clients } from './pages/Clients';
 import { Products } from './pages/Products';
+import { Tasks } from './pages/Tasks';
+import { ClientDetail } from './pages/ClientDetail';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = !!localStorage.getItem('token');
@@ -26,7 +28,9 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="orders" element={<Orders />} />
           <Route path="clients" element={<Clients />} />
+          <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="products" element={<Products />} />
+          <Route path="tasks" element={<Tasks />} />
         </Route>
       </Routes>
     </BrowserRouter>

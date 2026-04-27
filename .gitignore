@@ -227,3 +227,16 @@ current_view.png
 step_*.png
 workflow_result.png
 .worktrees/
+
+# Внутренние материалы
+.claude/
+.qwen/
+CLAUDE.md
+GEMINI.md
+QWEN.md
+
+# Локальная БД
+*.db
+*.sqlite
+*.sqlite3
+

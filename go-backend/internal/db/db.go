@@ -27,6 +27,7 @@ func InitDB(dbPath string) *gorm.DB {
 		&domain.Payment{},
 		&domain.Product{},
 		&domain.Task{},
+		&domain.OrderComment{},
 		&domain.ActivityLog{},
 	)
 	if err != nil {

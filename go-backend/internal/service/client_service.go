@@ -9,6 +9,7 @@ type ClientService interface {
 	CreateClient(tenantID uint, name, phone, telegram, notes string) (*domain.Client, error)
 	GetClient(id, tenantID uint) (*domain.Client, error)
 	ListClients(tenantID uint) ([]domain.Client, error)
+	SearchClients(tenantID uint, query string) ([]domain.Client, error)
 }
 
 type clientService struct {
@@ -31,4 +32,7 @@ func (s *clientService) CreateClient(tID uint, name, phone, telegram, notes stri
 }
 
 func (s *clientService) GetClient(id, tID uint) (*domain.Client, error) { return s.repo.GetByID(id, tID) }
-func (s *clientService) ListClients(tID uint) ([]domain.Client, error) { return s.repo.List(tID) }
+func (s *clientService) ListClients(tID uint) ([]domain.Client, error)  { return s.repo.List(tID) }
+func (s *clientService) SearchClients(tID uint, query string) ([]domain.Client, error) {
+	return s.repo.Search(tID, query)
+}

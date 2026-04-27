@@ -1,117 +1,140 @@
-import React, { useEffect, useState } from 'react';
-import { request } from '../api/client';
-import { Plus, Trash2, AlertTriangle, ToggleLeft, ToggleRight, PackageCheck, Archive, Edit3 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Package, Plus, Trash2, Edit3, Archive, ArchiveRestore } from 'lucide-react';
+import { useProducts } from '../hooks/useProducts';
+import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import type { Product } from '../types';
+
+const emptyForm = { name: '', description: '', price: '' };
 
 export const Products: React.FC = () => {
-  const [products, setProducts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'active' | 'archive'>('active');
-  
+  const { active, archived, create, update, toggle, remove, loading, error, mutationError, clearMutationError } = useProducts();
+
+  const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [showModal, setShowModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [targetId, setTargetId] = useState<number | null>(null);
-  const [editMode, setEditMode] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [editTarget, setEditTarget] = useState<Product | null>(null);
+  const [form, setForm] = useState(emptyForm);
 
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState('0');
+  if (loading) return <div style={{ padding: '2rem', color: 'var(--text-muted)' }}>Загрузка...</div>;
+  if (error) return <div style={{ padding: '2rem', color: 'var(--danger)' }}>{error}</div>;
 
-  useEffect(() => { fetchProducts(); }, []);
+  const field = (key: keyof typeof emptyForm) => ({
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm(prev => ({ ...prev, [key]: e.target.value })),
+  });
 
-  const fetchProducts = async () => {
-    const data = await request('/products');
-    if (data) setProducts(data);
-  };
+  const openCreate = () => { setForm(emptyForm); setEditTarget(null); setShowModal(true); };
 
-  const handleEdit = (p: any) => {
-    setTargetId(p.id);
-    setName(p.name);
-    setPrice(p.price.toString());
-    setEditMode(true);
+  const openEdit = (p: Product) => {
+    setForm({ name: p.name, description: p.description, price: String(p.price) });
+    setEditTarget(p);
     setShowModal(true);
   };
 
-  const handleToggle = async (id: number) => {
-    await request(`/products/${id}/toggle`, { method: 'PATCH' });
-    fetchProducts();
-  };
-
-  const confirmDelete = async () => {
-    if (targetId) {
-      await request(`/products/${targetId}`, { method: 'DELETE' });
-      setShowDeleteConfirm(false); setTargetId(null); fetchProducts();
-    }
-  };
+  const closeModal = () => { setShowModal(false); setEditTarget(null); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { name, description: '', price: parseFloat(price) };
-    if (editMode && targetId) {
-      await request(`/products/${targetId}`, { method: 'PUT', body: JSON.stringify(payload) });
+    const payload = { name: form.name, description: form.description, price: parseFloat(form.price) || 0 };
+    if (editTarget) {
+      await update(editTarget.id, payload);
     } else {
-      await request('/products', { method: 'POST', body: JSON.stringify(payload) });
+      await create(payload);
     }
     closeModal();
-    fetchProducts();
   };
 
-  const closeModal = () => {
-    setShowModal(false);
-    setEditMode(false);
-    setTargetId(null);
-    setName(''); setPrice('0');
-  };
-
-  const filteredProducts = products.filter(p => activeTab === 'active' ? p.is_active : !p.is_active);
+  const list = tab === 'active' ? active : archived;
 
   return (
     <div>
-      <header className="header" style={{ padding: '0 0 2rem 0', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <div><h1>Товары</h1><p className="text-muted">Каталог цен</p></div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={18} /> Добавить</button>
-      </header>
-
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button onClick={() => setActiveTab('active')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.25rem', borderRadius: '12px', border: 'none', cursor: 'pointer', background: activeTab === 'active' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: activeTab === 'active' ? 'white' : 'var(--text-muted)' }}><PackageCheck size={18} /> Активные</button>
-        <button onClick={() => setActiveTab('archive')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.25rem', borderRadius: '12px', border: 'none', cursor: 'pointer', background: activeTab === 'archive' ? 'var(--glass-border)' : 'rgba(255,255,255,0.05)', color: activeTab === 'archive' ? 'white' : 'var(--text-muted)' }}><Archive size={18} /> Архив</button>
-      </div>
-
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
-        <table className="data-table">
-          <thead><tr><th>Наименование</th><th>Цена</th><th>Статус</th><th>Действия</th></tr></thead>
-          <tbody>
-            {filteredProducts.map((p: any) => (
-              <tr key={p.id}>
-                <td style={{ fontWeight: 600 }}>{p.name}</td>
-                <td>{parseFloat(p.price).toLocaleString()} ₽</td>
-                <td><button onClick={() => handleToggle(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: p.is_active ? 'var(--success)' : 'var(--text-muted)', fontWeight: 500, fontSize: '0.85rem' }}>{p.is_active ? <ToggleRight size={28} /> : <ToggleLeft size={28} />} {p.is_active ? 'В каталоге' : 'В архиве'}</button></td>
-                <td style={{ display: 'flex', gap: '8px' }}>
-                  <button className="btn" style={{ padding: '4px 8px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--primary)' }} onClick={() => handleEdit(p)}><Edit3 size={14} /></button>
-                  <button className="btn" style={{ padding: '4px 8px', background: 'rgba(239, 68, 68, 0.2)', color: 'var(--danger)' }} onClick={() => { setTargetId(p.id); setShowDeleteConfirm(true); }}><Trash2 size={14} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {showDeleteConfirm && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(8px)' }}>
-          <div className="glass-panel" style={{ width: '350px', padding: '2rem', textAlign: 'center' }}><AlertTriangle size={48} color="var(--danger)" style={{ margin: '0 auto 1rem' }} /><h2>Удалить товар?</h2><div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}><button className="btn" style={{ flex: 1, background: 'var(--danger)', color: 'white' }} onClick={confirmDelete}>Удалить</button><button className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }} onClick={() => setShowDeleteConfirm(false)}>Отмена</button></div></div>
+      {mutationError && (
+        <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{mutationError}</span>
+          <button onClick={clearMutationError} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
         </div>
       )}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+        <div><h1>Товары</h1><p className="text-muted">Каталог услуг и продуктов</p></div>
+        <button className="btn btn-primary" onClick={openCreate}><Plus size={18} /> Добавить</button>
+      </header>
+
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        <TabBtn active={tab === 'active'} onClick={() => setTab('active')}>Активные ({active.length})</TabBtn>
+        <TabBtn active={tab === 'archived'} onClick={() => setTab('archived')}>Архив ({archived.length})</TabBtn>
+      </div>
+
+      {list.length === 0 && (
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>Пусто</p>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+        {list.map(p => (
+          <ProductCard
+            key={p.id}
+            product={p}
+            onEdit={() => openEdit(p)}
+            onToggle={() => toggle(p.id)}
+            onDelete={() => setDeleteId(p.id)}
+          />
+        ))}
+      </div>
 
       {showModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '2rem' }}>
-            <h2>{editMode ? 'Редактировать товар' : 'Новый товар'}</h2>
-            <form onSubmit={handleSubmit} style={{ marginTop: '1.5rem' }}>
-              <div className="input-group"><label>Наименование</label><input value={name} onChange={e => setName(e.target.value)} required /></div>
-              <div className="input-group"><label>Цена (₽)</label><input type="number" value={price} onChange={e => setPrice(e.target.value)} /></div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>{editMode ? 'Сохранить' : 'Создать'}</button>
-              <button type="button" className="btn" style={{ width: '100%', marginTop: '0.5rem' }} onClick={closeModal}>Отмена</button>
-            </form>
-          </div>
-        </div>
+        <Modal title={editTarget ? 'Редактировать' : 'Новый товар'} onClose={closeModal}>
+          <form onSubmit={handleSubmit}>
+            <div className="input-group"><label>Название *</label><input required {...field('name')} /></div>
+            <div className="input-group"><label>Описание</label><input {...field('description')} /></div>
+            <div className="input-group"><label>Цена (₽)</label><input type="number" min="0" {...field('price')} /></div>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+              {editTarget ? 'Сохранить' : 'Создать'}
+            </button>
+          </form>
+        </Modal>
+      )}
+
+      {deleteId && (
+        <ConfirmDialog
+          message="Удалить товар?"
+          onConfirm={() => { remove(deleteId); setDeleteId(null); }}
+          onCancel={() => setDeleteId(null)}
+        />
       )}
     </div>
   );
 };
+
+const ProductCard: React.FC<{
+  product: Product;
+  onEdit: () => void;
+  onToggle: () => void;
+  onDelete: () => void;
+}> = ({ product, onEdit, onToggle, onDelete }) => (
+  <div className="glass-panel" style={{ padding: '1.5rem', position: 'relative', opacity: product.is_active ? 1 : 0.6 }}>
+    <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '6px' }}>
+      <button onClick={onEdit} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', opacity: 0.7 }}><Edit3 size={16} /></button>
+      <button onClick={onToggle} title={product.is_active ? 'В архив' : 'Восстановить'} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', opacity: 0.7 }}>
+        {product.is_active ? <Archive size={16} /> : <ArchiveRestore size={16} />}
+      </button>
+      <button onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', opacity: 0.7 }}><Trash2 size={16} /></button>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.75rem', paddingRight: '4rem' }}>
+      <Package size={20} color="var(--primary)" />
+      <h3 style={{ margin: 0 }}>{product.name}</h3>
+    </div>
+    {product.description && <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.75rem' }}>{product.description}</p>}
+    <p style={{ fontSize: '1.2rem', fontWeight: 600, margin: 0 }}>{parseFloat(String(product.price)).toLocaleString()} ₽</p>
+  </div>
+);
+
+const TabBtn: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className="btn"
+    style={{ background: active ? 'var(--primary)' : 'rgba(255,255,255,0.08)', color: active ? 'white' : 'var(--text-muted)' }}
+  >
+    {children}
+  </button>
+);

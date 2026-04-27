@@ -9,6 +9,7 @@ type ClientRepository interface {
 	Create(client *domain.Client) error
 	GetByID(id uint, tenantID uint) (*domain.Client, error)
 	List(tenantID uint) ([]domain.Client, error)
+	Search(tenantID uint, query string) ([]domain.Client, error)
 	Update(client *domain.Client) error
 	Delete(id uint, tenantID uint) error
 }
@@ -29,7 +30,15 @@ func (r *clientRepo) GetByID(id, tID uint) (*domain.Client, error) {
 }
 func (r *clientRepo) List(tID uint) ([]domain.Client, error) {
 	var list []domain.Client
-	err := r.db.Where("tenant_id = ?", tID).Find(&list).Error
+	err := r.db.Where("tenant_id = ?", tID).Order("name").Find(&list).Error
+	return list, err
+}
+
+func (r *clientRepo) Search(tID uint, query string) ([]domain.Client, error) {
+	var list []domain.Client
+	like := "%" + query + "%"
+	err := r.db.Where("tenant_id = ? AND (name LIKE ? OR phone LIKE ? OR telegram LIKE ?)", tID, like, like, like).
+		Order("name").Find(&list).Error
 	return list, err
 }
 func (r *clientRepo) Update(c *domain.Client) error { return r.db.Save(c).Error }
