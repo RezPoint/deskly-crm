@@ -7,6 +7,7 @@ class DashboardSummaryOut(BaseModel):
     total_orders: int
     active_orders: int
     total_revenue: Decimal
+    total_paid: Decimal
     total_debt: Decimal
     orders_by_status: Dict[str, int]
     recent_activity: list[Dict[str, str]]

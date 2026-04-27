@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "DesklyCRM"
-    APP_VERSION: str = "0.3.2"
+    APP_VERSION: str = "0.3.3"
     API_V1_STR: str = "/api/v1"
     
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./desklycrm.db")

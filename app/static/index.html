@@ -5,10 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DesklyCRM</title>
-    <!-- Modern Font: Inter -->
+    <!-- Modern Font: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 
@@ -48,7 +48,18 @@
 
     <!-- View: Dashboard (Layout) -->
     <div id="view-dashboard" class="view">
-        <aside class="sidebar glass-panel">
+        <!-- Mobile: Hamburger button -->
+        <button class="hamburger-btn" id="btn-hamburger" aria-label="Меню">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+        <!-- Mobile: Sidebar backdrop -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <aside class="sidebar glass-panel" id="sidebar">
             <div class="brand">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" class="brand-logo">
                     <path
@@ -85,6 +96,13 @@
                     </svg>
                     Заказы
                 </a>
+                <a href="#" class="nav-item" data-target="catalog">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 6h16M4 12h16M4 18h16"></path>
+                        <path d="M8 6v12M16 6v12" opacity="0.3"></path>
+                    </svg>
+                    Каталог
+                </a>
                 <a href="#" class="nav-item" data-target="reminders">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
@@ -109,9 +127,28 @@
                 </a>
             </nav>
             <div class="sidebar-footer">
-                <div class="user-info">
-                    <span id="current-user-email" class="text-sm fw-600">user@example.com</span>
-                    <span id="current-user-role" class="badge">admin</span>
+                <div class="footer-top">
+                    <div class="user-info">
+                        <span id="current-user-email" class="text-sm fw-600">user@example.com</span>
+                        <span id="current-user-role" class="badge">admin</span>
+                    </div>
+                    <button class="theme-toggle" id="btn-theme" title="Сменить тему">
+                        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style="display:none">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
                 </div>
                 <button id="btn-logout" class="btn btn-outline btn-sm w-100 mt-2">Выйти</button>
             </div>
@@ -158,6 +195,13 @@
                         <p class="text-muted">Попробуйте изменить параметры поиска или добавить новые записи.</p>
                     </div>
                 </div>
+
+                <!-- Kanban Board Container -->
+                <div id="kanban-view" style="display: none; padding: 0 1.5rem;">
+                    <div class="kanban-container" id="kanban-container">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -169,7 +213,7 @@
         </div>
     </div>
 
-    <script src="/js/app.js"></script>
+    <script src="/js/app.js?v=0.3.6"></script>
 </body>
 
 </html>

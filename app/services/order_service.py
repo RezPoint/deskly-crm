@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from datetime import datetime, time
 
-from ..models import Order, Payment, Client
+from ..models import Order, Payment, Client, OrderItem
 from ..schemas.order import OrderCreate, OrderStatusUpdate, OrderPriceUpdate
 
 def _parse_date(value: Optional[str], is_end: bool = False) -> Optional[datetime]:
@@ -80,6 +80,27 @@ class OrderService:
             comment=data.comment.strip() if data.comment else None,
         )
         self.db.add(o)
+        self.db.flush()
+
+        if data.items:
+            total_sum = Decimal('0.00')
+            for item in data.items:
+                quantity = Decimal(str(item.quantity))
+                unit_price = Decimal(str(item.unit_price))
+                total_price = quantity * unit_price
+                total_sum += total_price
+
+                db_item = OrderItem(
+                    tenant_id=self.tenant_id,
+                    order_id=o.id,
+                    title=item.title.strip(),
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    total_price=total_price
+                )
+                self.db.add(db_item)
+            o.price = total_sum
+
         self.db.commit()
         self.db.refresh(o)
         return o
@@ -91,19 +112,22 @@ class OrderService:
 
     def get_summary(self, order_id: int):
         o = self.get_order(order_id)
-        paid_raw = self.db.execute(
-            select(func.coalesce(func.sum(Payment.amount), 0))
-            .where(Payment.order_id == order_id, Payment.tenant_id == self.tenant_id)
+        client = self.db.execute(
+            select(Client).where(Client.id == o.client_id, Client.tenant_id == self.tenant_id)
         ).scalar_one()
 
-        paid = Decimal(str(paid_raw))
+        payments = self.db.execute(
+            select(Payment).where(Payment.order_id == order_id, Payment.tenant_id == self.tenant_id).order_by(Payment.created_at.desc())
+        ).scalars().all()
+
+        paid = sum([Decimal(str(p.amount)) for p in payments])
         price = Decimal(str(o.price))
         
         return {
-            "order_id": o.id,
-            "price": price,
-            "paid_total": paid,
+            "order": o,
+            "client": client,
             "balance": price - paid,
+            "payments": payments,
         }
 
     def update_status(self, order_id: int, status: str):

@@ -1,27 +1,36 @@
 from datetime import datetime, timezone
-
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
-from sqlalchemy.orm import relationship
-
+from sqlalchemy.orm import relationship, declared_attr
 from ..core.database import Base
-
 
 def utcnow():
     return datetime.now(timezone.utc)
 
+class TimestampMixin:
+    """Миксин для добавления времени создания записи."""
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
 
-class Tenant(Base):
+class TenantMixin:
+    """Миксин для поддержки Multi-tenancy."""
+    @declared_attr
+    def tenant_id(cls):
+        return Column(Integer, ForeignKey("tenants.id"), nullable=False, default=1, index=True)
+
+class BaseEntity(Base, TimestampMixin, TenantMixin):
+    """Базовый класс для всех сущностей CRM."""
+    __abstract__ = True
+    id = Column(Integer, primary_key=True, index=True)
+
+class Tenant(Base, TimestampMixin):
     __tablename__ = "tenants"
-
     id = Column(Integer, primary_key=True)
     name = Column(String(120), nullable=False)
     slug = Column(String(120), nullable=False, unique=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    
+    users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
+    invites = relationship("Invite", back_populates="tenant", cascade="all, delete-orphan")
 
-    users = relationship("User", back_populates="tenant")
-
-
-class User(Base):
+class User(Base, TimestampMixin):
     __tablename__ = "users"
     __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_users_email_tenant"),)
 
@@ -30,94 +39,104 @@ class User(Base):
     email = Column(String(200), nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(30), nullable=False, default="owner")  # владелец/админ/наблюдатель
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     tenant = relationship("Tenant", back_populates="users")
 
-
-class Client(Base):
+class Client(BaseEntity):
     __tablename__ = "clients"
     __table_args__ = (
         UniqueConstraint("tenant_id", "phone", name="uq_clients_phone_tenant"),
         UniqueConstraint("tenant_id", "telegram", name="uq_clients_telegram_tenant"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     name = Column(String(120), nullable=False)
-    phone = Column(String(50), nullable=True)
-    telegram = Column(String(80), nullable=True)
+    phone = Column(String(50), nullable=True, index=True)
+    telegram = Column(String(80), nullable=True, index=True)
     notes = Column(String(1000), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     orders = relationship("Order", back_populates="client", cascade="all, delete-orphan")
 
-
-class Order(Base):
+class Order(BaseEntity):
     __tablename__ = "orders"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
-
     title = Column(String(200), nullable=False)
     price = Column(Numeric(12, 2), nullable=False, default=0)
     status = Column(String(30), nullable=False, default="new")  # новый/в работе/выполнен/отменен
     comment = Column(String(1000), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     client = relationship("Client", back_populates="orders")
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="order", cascade="all, delete-orphan")
 
+class OrderItem(BaseEntity):
+    __tablename__ = "order_items"
 
-class Payment(Base):
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    quantity = Column(Numeric(12, 2), nullable=False, default=1)
+    unit_price = Column(Numeric(12, 2), nullable=False, default=0)
+    total_price = Column(Numeric(12, 2), nullable=False, default=0)
+
+    order = relationship("Order", back_populates="items")
+
+class Payment(BaseEntity):
     __tablename__ = "payments"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
-
     amount = Column(Numeric(12, 2), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     order = relationship("Order", back_populates="payments")
 
-
-class ActivityLog(Base):
+class ActivityLog(BaseEntity):
     __tablename__ = "activity_log"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, nullable=False, default=1, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     action = Column(String(50), nullable=False)
     entity_type = Column(String(30), nullable=False)
     entity_id = Column(Integer, nullable=True)
     message = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
 
-
-class Reminder(Base):
+class Reminder(BaseEntity):
     __tablename__ = "reminders"
+    __table_args__ = (UniqueConstraint("tenant_id", "entity_type", "entity_id", "due_at", name="uq_reminders_tenant_entity"),)
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, nullable=False, default=1, index=True)
-    title = Column(String(200), nullable=False)
-    due_at = Column(DateTime(timezone=True), nullable=False, index=True)
-    status = Column(String(20), nullable=False, default="open")  # открыта/выполнена
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     entity_type = Column(String(30), nullable=True)
     entity_id = Column(Integer, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    title = Column(String(200), nullable=False)
+    due_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    status = Column(String(30), nullable=False, default="pending")  # pending/done/expired
 
-
-class Invite(Base):
+class Invite(Base, TimestampMixin):
     __tablename__ = "invites"
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
     email = Column(String(200), nullable=False)
-    role = Column(String(30), nullable=False, default="viewer")
-    token = Column(String(128), nullable=False, unique=True, index=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    role = Column(String(30), nullable=False, default="manager")
+    token = Column(String(120), nullable=False, unique=True, index=True)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     accepted_at = Column(DateTime(timezone=True), nullable=True)
-    accepted_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    tenant = relationship("Tenant", back_populates="invites")
+
+class Product(BaseEntity):
+    __tablename__ = "products"
+
+    name = Column(String(200), nullable=False, index=True)
+    description = Column(String(1000), nullable=True)
+    price = Column(Numeric(12, 2), nullable=False, default=0)
+    is_active = Column(Integer, default=1, nullable=False)  # 1 - active, 0 - inactive (archived)
+
+class Task(BaseEntity):
+    __tablename__ = "tasks"
+
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True, index=True)
+    title = Column(String(300), nullable=False)
+    description = Column(String(2000), nullable=True)
+    status = Column(String(30), nullable=False, default="new")  # new / in_progress / done
+    due_date = Column(DateTime(timezone=True), nullable=True, index=True)
+
+    order = relationship("Order", back_populates="tasks")

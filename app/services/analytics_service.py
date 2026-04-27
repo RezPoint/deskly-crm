@@ -82,6 +82,7 @@ class AnalyticsService:
             "total_orders": total_orders,
             "active_orders": active_orders,
             "total_revenue": total_revenue,
+            "total_paid": total_paid,
             "total_debt": total_debt,
             "orders_by_status": orders_by_status,
             "recent_activity": recent_activity
